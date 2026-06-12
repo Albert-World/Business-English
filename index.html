@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM English — Business Scenarios</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-logo">
+    <div class="hdr-icon">💼</div>
+    <div>
+      <div class="hdr-name">PM English</div>
+      <div class="hdr-sub">Business Scenarios</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="hdr-pill flash" id="fc-pill" onclick="scrollToFC()" style="display:none">📚 <span id="fc-pill-n">0</span> saved</span>
+    <span class="hdr-pill" id="sc-pill">0 scenarios</span>
+  </div>
+</header>
+
+<div class="save-popup" id="save-popup">
+  <button class="sp-btn" id="sp-save-btn">📌 Save to vocabulary</button>
+  <button class="sp-btn" id="sp-look-btn">🔍 Look up in dictionary</button>
+</div>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="sidebar">
+      <div class="sb-hd">Scenarios</div>
+      <div id="scenario-list"></div>
+      <button class="sb-add" onclick="openAddModal()">＋ Add manually</button>
+      <button class="sb-add sb-add-ai" onclick="openAiModal()">✦ Generate with AI</button>
+    </div>
+    <div id="main-col">
+      <div class="main-empty">
+        <div class="big">🎯</div>
+        <p>Select a scenario to start practicing</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SCENARIO MODAL (manual) -->
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <div class="m-hd"><span class="m-title">Add New Scenario</span><button class="m-close" onclick="closeAddModal()">✕</button></div>
+    <div class="m-body">
+      <div>
+        <div class="fl">Group</div>
+        <select class="fi" id="m-group"><option value="">— No group —</option></select>
+        <input class="fi" id="m-newgroup" placeholder="Or type a new group name…" style="margin-top:6px">
+      </div>
+      <div><div class="fl">Title</div><input class="fi" id="m-title" placeholder="e.g. Vendor Negotiation"></div>
+      <div><div class="fl">Subtitle</div><input class="fi" id="m-sub" placeholder="e.g. Negotiating with a third-party vendor"></div>
+      <div class="row2">
+        <div><div class="fl">Icon (emoji)</div><input class="fi" id="m-icon" placeholder="🤝" style="font-size:18px"></div>
+        <div><div class="fl">Level</div><select class="fi" id="m-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div>
+      </div>
+      <div><div class="fl">Key vocabulary (comma-separated)</div><input class="fi" id="m-vocab" placeholder="negotiate, vendor, contract, terms"></div>
+      <div><div class="fl">PM Tip</div><input class="fi" id="m-tip" placeholder="Language tip for this scenario..."></div>
+      <div>
+        <div class="fl">Dialogue lines</div>
+        <div id="m-lines"></div>
+        <button class="add-line" onclick="addModalLine()">＋ Add line</button>
+      </div>
+    </div>
+    <div class="m-ft">
+      <button class="btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn-save" onclick="saveManualScenario()">Save Scenario</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI GENERATE MODAL -->
+<div class="overlay" id="ai-modal">
+  <div class="modal">
+    <div class="m-hd"><span class="m-title">✦ Generate Scenario with AI</span><button class="m-close" onclick="closeAiModal()">✕</button></div>
+    <div class="m-body">
+      <div>
+        <div class="fl">Group (optional)</div>
+        <select class="fi" id="ai-group"><option value="">— No group —</option></select>
+        <input class="fi" id="ai-newgroup" placeholder="Or type a new group name…" style="margin-top:6px">
+      </div>
+      <div>
+        <div class="fl">Describe the situation (in Vietnamese or English)</div>
+        <textarea class="fi" id="ai-prompt" rows="4" placeholder="e.g. Tình huống PM phải trình bày kế hoạch dự án trước hội đồng đầu tư. Cần thuyết phục họ về timeline và ngân sách."></textarea>
+      </div>
+      <div class="row2">
+        <div><div class="fl">Level</div><select class="fi" id="ai-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div>
+        <div><div class="fl">Number of lines</div><select class="fi" id="ai-lines"><option value="4">4 lines</option><option value="6" selected>6 lines</option><option value="8">8 lines</option></select></div>
+      </div>
+      <div class="ai-status" id="ai-status">Generating dialogue…</div>
+      <div class="ai-preview" id="ai-preview"></div>
+    </div>
+    <div class="m-ft">
+      <button class="btn-ghost" onclick="closeAiModal()">Cancel</button>
+      <button class="btn-ai" id="ai-gen-btn" onclick="generateAiScenario()">
+        <span class="spinner" id="ai-spinner" style="display:none"></span>
+        ✦ Generate
+      </button>
+      <button class="btn-save" id="ai-save-btn" onclick="saveAiScenario()" style="display:none">Save Scenario</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORD MODAL -->
+<div class="overlay" id="word-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="m-hd"><span class="m-title" id="wm-title">Save word</span><button class="m-close" onclick="closeWordModal()">✕</button></div>
+    <div class="m-body">
+      <div id="wm-def-area" class="wsm-loading">Looking up definition…</div>
+      <div><div class="fl">Your note / custom definition</div><textarea class="fi" id="wm-note" placeholder="Add your own note or memory hook…" rows="3"></textarea></div>
+      <div><div class="fl">Context (auto-filled from dialogue)</div><input class="fi" id="wm-ctx" placeholder="Original sentence"></div>
+    </div>
+    <div class="m-ft">
+      <button class="btn-ghost" onclick="closeWordModal()">Cancel</button>
+      <button class="btn-save" onclick="confirmSaveWord()">Save to Vocabulary</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts: load order matters -->
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/vocab.js"></script>
+<script src="js/scenarios.js"></script>
+<script>
+/* ── Bootstrap ── */
+window._currentScenario = null;
+
+async function init() {
+  // Migrate + load saved words
+  savedWords = savedWords.map(w => ({ reps: 0, ...w }));
+
+  // Load all scenario .md files
+  SCENARIOS = await loadScenarios();
+
+  // Boot audio
+  refreshVoices();
+  if (window.speechSynthesis) speechSynthesis.onvoiceschanged = refreshVoices;
+
+  // Render
+  renderSidebar();
+  setupSelectionListener();
+  updateFCPill();
+  listSubTab = getDefaultListTab();
+}
+
+// Close modals on backdrop click
+window.addEventListener('click', e => {
+  if (e.target === document.getElementById('add-modal'))  closeAddModal();
+  if (e.target === document.getElementById('ai-modal'))   closeAiModal();
+  if (e.target === document.getElementById('word-modal')) closeWordModal();
+});
+
+init();
+</script>
+</body>
+</html>

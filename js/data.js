@@ -20,6 +20,31 @@ const SCENARIO_FILES = [
   'scenarios/discovery.md',
 ];
 
+/*
+ * Resolve a path relative to the directory where index.html lives,
+ * regardless of what subdirectory GitHub Pages serves the site from.
+ *
+ * Strategy: find the <script src="js/data.js"> tag — its .src is an
+ * absolute URL like https://user.github.io/Business-English/js/data.js
+ * Strip /js/data.js to get the site root, then append the relative path.
+ */
+function resolveUrl(relativePath) {
+  const scripts = document.querySelectorAll('script[src]');
+  let base = null;
+  for (const s of scripts) {
+    if (s.src && s.src.includes('/js/data.js')) {
+      base = s.src.replace(/\/js\/data\.js([?#].*)?$/, '/');
+      break;
+    }
+  }
+  // Fallback: derive from current page URL (works when index.html is at root)
+  if (!base) {
+    base = window.location.href.replace(/\/[^/]*$/, '/');
+    if (!base.endsWith('/')) base += '/';
+  }
+  return base + relativePath;
+}
+
 /* ── Parse front-matter + dialogue from a .md string ── */
 function parseMd(text) {
   const fmMatch = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -75,7 +100,12 @@ function parseMd(text) {
 /* ── Load all scenario .md files ── */
 async function loadScenarios() {
   const results = await Promise.all(
-    SCENARIO_FILES.map(f => fetch(f).then(r => r.text()).then(parseMd).catch(() => null))
+    SCENARIO_FILES.map(f =>
+      fetch(resolveUrl(f))
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(parseMd)
+        .catch(e => { console.warn('Could not load', f, e.message); return null; })
+    )
   );
   return results.filter(Boolean);
 }

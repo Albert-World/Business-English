@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Business English — Scenarios for PM & Professionals</title>
+<title>Business English — Scenarios for Professionals</title>
 <link rel="stylesheet" href="css/styles.css">
 <style>
   /* Additional styles for new features */
@@ -18,7 +18,6 @@
   }
   body { background: var(--bg-body); }
   
-  /* Scenario grid (main list) */
   .scenario-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -47,7 +46,6 @@
   .progress-mini-fill { background: var(--primary); height: 100%; width: 0%; border-radius: 10px; }
   .level-badge { font-size: 0.65rem; background: #deeeff; padding: 2px 8px; border-radius: 30px; font-weight: 500; }
   
-  /* Filter bar */
   .filter-bar {
     display: flex;
     flex-wrap: wrap;
@@ -85,7 +83,6 @@
     margin-bottom: 1rem;
   }
   
-  /* Line completion styling */
   .dline .completion-check {
     margin-right: 12px;
     display: inline-flex;
@@ -141,7 +138,6 @@
     from { opacity: 0; transform: translateX(-50%) translateY(20px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
-  /* music player */
   .music-player {
     position: fixed;
     bottom: 20px;
@@ -163,7 +159,6 @@
     font-size: 1.4rem;
     cursor: pointer;
   }
-  /* edit/delete buttons in card */
   .scard-actions {
     display: flex;
     gap: 8px;
@@ -179,10 +174,25 @@
   }
   .icon-btn:hover { opacity: 1; }
   .empty-state { text-align: center; padding: 3rem; color: #7c8ba0; }
+  #user-status { cursor: pointer; background: #eef2ff; }
 </style>
 </head>
 <body>
 
+<!-- ACCESS CODE MODAL -->
+<div id="access-modal" class="overlay" style="display: flex; z-index: 10000;">
+  <div class="modal" style="max-width: 400px;">
+    <div class="m-hd"><span class="m-title">🔐 Access Required</span></div>
+    <div class="m-body">
+      <p style="margin-bottom: 16px;">Please enter the access code to continue.</p>
+      <input type="password" id="access-code-input" class="fi" placeholder="Enter code" style="margin-bottom: 16px;">
+      <button class="btn-save" id="submit-access-btn" style="width: 100%;">Submit</button>
+      <div id="access-error" style="color: red; margin-top: 12px; text-align: center;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="app-container" style="display: none;">
 <header class="hdr">
   <div class="hdr-logo">
     <div class="hdr-icon">💼</div>
@@ -192,7 +202,8 @@
     </div>
   </div>
   <div class="hdr-right">
-    <span class="hdr-pill flash" id="fc-pill" onclick="scrollToFC()" style="display:none">📚 <span id="fc-pill-n">0</span> saved</span>
+    <span class="hdr-pill" id="user-status" onclick="showLoginModal()">👤 Login</span>
+    <span class="hdr-pill flash" id="fc-pill" style="display:none">📚 <span id="fc-pill-n">0</span> saved</span>
     <span class="hdr-pill" id="sc-pill">0 scenarios</span>
   </div>
 </header>
@@ -204,7 +215,6 @@
 
 <div class="wrap">
   <div class="grid" style="grid-template-columns: 280px 1fr;">
-    <!-- LEFT SIDEBAR: filters + add buttons -->
     <div class="sidebar">
       <div class="sb-hd">Groups</div>
       <div id="group-filter-list" class="filter-group-vertical"></div>
@@ -214,16 +224,13 @@
       <button class="sb-add" onclick="openImportTextModal()">📋 Paste dialogue</button>
     </div>
 
-    <!-- MAIN CONTENT: scenario list OR detail view -->
     <div id="main-col">
-      <div id="dynamic-content">
-        <!-- will be filled by JS: either scenario grid or detail view -->
-      </div>
+      <div id="dynamic-content"></div>
     </div>
   </div>
 </div>
 
-<!-- MODAL for create/edit (unified) -->
+<!-- MODAL for create/edit -->
 <div class="overlay" id="create-modal">
   <div class="modal" style="max-width: 700px">
     <div class="m-hd"><span class="m-title" id="create-modal-title">Create Scenario</span><button class="m-close" onclick="closeCreateModal()">✕</button></div>
@@ -263,7 +270,7 @@
   </div>
 </div>
 
-<!-- Import text modal (paste dialogue) -->
+<!-- Import text modal -->
 <div class="overlay" id="import-modal">
   <div class="modal" style="max-width:600px">
     <div class="m-hd"><span>📋 Paste Dialogue</span><button class="m-close" onclick="closeImportModal()">✕</button></div>
@@ -276,7 +283,7 @@
   </div>
 </div>
 
-<!-- Word modal (vocab) -->
+<!-- Word modal -->
 <div class="overlay" id="word-modal">
   <div class="modal" style="max-width:480px">
     <div class="m-hd"><span class="m-title" id="wm-title">Save word</span><button class="m-close" onclick="closeWordModal()">✕</button></div>
@@ -291,24 +298,12 @@
     </div>
   </div>
 </div>
+</div> <!-- end app-container -->
 
-<!-- Scripts: load order matters -->
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/vocab.js"></script>
 <script src="js/scenarios.js"></script>
 <script src="js/main.js"></script>
 </body>
-  <!-- ACCESS CODE MODAL -->
-<div id="access-modal" class="overlay" style="display: flex; z-index: 10000;">
-  <div class="modal" style="max-width: 400px;">
-    <div class="m-hd"><span class="m-title">🔐 Access Required</span></div>
-    <div class="m-body">
-      <p style="margin-bottom: 16px;">Please enter the access code to continue.</p>
-      <input type="password" id="access-code-input" class="fi" placeholder="Enter code" style="margin-bottom: 16px;">
-      <button class="btn-save" id="submit-access-btn" style="width: 100%;">Submit</button>
-      <div id="access-error" style="color: red; margin-top: 12px; text-align: center;"></div>
-    </div>
-  </div>
-</div>
 </html>

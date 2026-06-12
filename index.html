@@ -299,4 +299,16 @@
 <script src="js/scenarios.js"></script>
 <script src="js/main.js"></script>
 </body>
+  <!-- ACCESS CODE MODAL -->
+<div id="access-modal" class="overlay" style="display: flex; z-index: 10000;">
+  <div class="modal" style="max-width: 400px;">
+    <div class="m-hd"><span class="m-title">🔐 Access Required</span></div>
+    <div class="m-body">
+      <p style="margin-bottom: 16px;">Please enter the access code to continue.</p>
+      <input type="password" id="access-code-input" class="fi" placeholder="Enter code" style="margin-bottom: 16px;">
+      <button class="btn-save" id="submit-access-btn" style="width: 100%;">Submit</button>
+      <div id="access-error" style="color: red; margin-top: 12px; text-align: center;"></div>
+    </div>
+  </div>
+</div>
 </html>

@@ -1,22 +1,21 @@
 // js/scenarios.js
 const ROLES = {
-  pm: { label: 'PM', dot: '#2176c7', avBg: '#b8d8f8', avColor: '#042C53' },
-  dev: { label: 'Dev', dot: '#3b8a16', avBg: '#bfe0a0', avColor: '#173404' },
-  client: { label: 'CL', dot: '#c47d18', avBg: '#f5d49a', avColor: '#412402' },
+  pm:     { label: 'PM',  dot: '#2176c7', avBg: '#b8d8f8', avColor: '#042C53' },
+  dev:    { label: 'Dev', dot: '#3b8a16', avBg: '#bfe0a0', avColor: '#173404' },
+  client: { label: 'CL',  dot: '#c47d18', avBg: '#f5d49a', avColor: '#412402' },
 };
 window.ROLES = ROLES;
 
 const LEVEL_S = {
-  Beginner: { color: '#3b6d11', bg: '#edf7e3', border: 'rgba(59,109,17,.2)' },
+  Beginner:     { color: '#3b6d11', bg: '#edf7e3', border: 'rgba(59,109,17,.2)' },
   Intermediate: { color: '#1a65ad', bg: '#deeeff', border: 'rgba(26,101,173,.2)' },
-  Advanced: { color: '#a32d2d', bg: '#fde8e8', border: 'rgba(163,45,45,.2)' },
+  Advanced:     { color: '#a32d2d', bg: '#fde8e8', border: 'rgba(163,45,45,.2)' },
 };
 
 let activeVocab = new Set();
 let currentViewMode = 'list';
 let currentGroupFilter = 'all';
 let scenarioCompletionMap = {};
-let tempManualLines = [];
 
 // ========== COMPLETION ==========
 function loadCompletionData() {
@@ -27,9 +26,7 @@ function loadCompletionData() {
       scenarioCompletionMap[s.id] = new Array(s.lines.length).fill(false);
   });
 }
-function saveCompletion() {
-  localStorage.setItem('be_scenario_progress', JSON.stringify(scenarioCompletionMap));
-}
+function saveCompletion() { localStorage.setItem('be_scenario_progress', JSON.stringify(scenarioCompletionMap)); }
 function getCompletionPercent(scenario) {
   const comp = scenarioCompletionMap[scenario.id] || new Array(scenario.lines.length).fill(false);
   const done = comp.filter(v => v === true).length;
@@ -61,7 +58,7 @@ function renderScenarioGrid() {
   const filterDiv = document.getElementById('filter-group-buttons');
   filterDiv.innerHTML = GROUPS.map(g => `<button class="filter-chip ${currentGroupFilter === g.id ? 'active' : ''}" onclick="setGroupFilter('${g.id}')">${g.icon} ${g.label}</button>`).join('');
   const grid = document.getElementById('scenario-grid-container');
-  if (!filtered.length) grid.innerHTML = '<div class="empty-state">📭 No scenarios. Create one!</div>';
+  if (!filtered.length) grid.innerHTML = '<div class="empty-state">📭 No scenarios. Create one using AI or Paste!</div>';
   else {
     grid.innerHTML = filtered.map(s => {
       const percent = getCompletionPercent(s);
@@ -105,7 +102,7 @@ function renderDetailView(s) {
   const mainHtml = `<button class="back-btn" onclick="renderScenarioGrid()">← Back</button>
     <div class="scard"><div class="scard-hd"><div class="scard-ico" style="background:${s.iconBg}">${s.icon}</div>
     <div class="scard-meta"><div class="scard-title">${escapeHtml(s.title)}</div><div class="scard-sub">${escapeHtml(s.sub)}</div></div>
-    <div class="scard-actions"><button onclick="editScenario('${s.id}')">✏️</button><button onclick="deleteScenarioConfirm('${s.id}')">🗑️</button></div>
+    <div class="scard-actions"><button class="icon-btn" onclick="editScenario('${s.id}')">✏️</button><button class="icon-btn" onclick="deleteScenarioConfirm('${s.id}')">🗑️</button></div>
     <span class="lvl-pill" style="background:${ls.bg};color:${ls.color}">${s.level}</span></div>
     <div class="scenario-progress"><span>Completion: ${percent}%</span><div class="progress-mini" style="width:120px"><div class="progress-mini-fill" style="width:${percent}%; background:green"></div></div></div>
     <div class="vocab-bar"><div class="chips">${s.vocab.map(v=>`<span class="chip ${activeVocab.has(v)?'on':''}" onclick="toggleVocab(this,'${escapeAttr(v)}')">${escapeHtml(v)}</span>`).join('')}</div></div>
@@ -135,19 +132,19 @@ function toggleVocab(el, word) {
 function editScenario(id) {
   const s = SCENARIOS.find(s=>s.id===id);
   if(!s) return;
-  document.getElementById('editing-scenario-id').value = id;
-  document.getElementById('c-title').value = s.title;
-  document.getElementById('c-sub').value = s.sub;
-  document.getElementById('c-icon').value = s.icon;
-  document.getElementById('c-level').value = s.level;
-  document.getElementById('c-vocab').value = s.vocab.join(', ');
-  document.getElementById('c-tip').value = s.tip.replace(/<[^>]*>/g,'');
-  tempManualLines = s.lines.map(l=>({speaker:l.speaker, role:l.role, text:l.text}));
-  renderManualLines();
-  openCreateModal('manual');
+  // Chỉ cho phép sửa title, sub, icon, level, vocab, tip (không sửa lines vì phức tạp)
+  const newTitle = prompt('Edit title:', s.title);
+  if (newTitle && newTitle.trim()) s.title = newTitle.trim();
+  const newSub = prompt('Edit subtitle:', s.sub);
+  if (newSub !== null) s.sub = newSub;
+  const newIcon = prompt('Edit icon (emoji):', s.icon);
+  if (newIcon && newIcon.trim()) s.icon = newIcon.trim();
+  persistScenarios();
+  if (window._currentScenario?.id === id) renderDetailView(s);
+  else renderScenarioGrid();
 }
 function deleteScenarioConfirm(id) {
-  if(confirm('Delete permanently?')) {
+  if(confirm('Delete scenario permanently?')) {
     const idx = SCENARIOS.findIndex(s=>s.id===id);
     if(idx!==-1) SCENARIOS.splice(idx,1);
     persistScenarios();
@@ -156,245 +153,96 @@ function deleteScenarioConfirm(id) {
   }
 }
 
-// ========== MODAL CREATE ==========
-function openCreateModal(tab='manual') {
-  document.getElementById('create-modal').classList.add('vis');
-  document.getElementById('editing-scenario-id').value = '';
-  tempManualLines = [{speaker:'PM',role:'pm',text:''},{speaker:'Client',role:'client',text:''}];
-  renderManualLines();
-  switchCreateTab(tab);
-  populateGroupSelects();
-}
-function closeCreateModal() { document.getElementById('create-modal').classList.remove('vis'); }
-function switchCreateTab(tab) {
-  document.querySelectorAll('.create-tab-pane').forEach(p=>p.style.display='none');
-  document.getElementById(`create-tab-${tab}`).style.display = 'block';
-}
-function renderManualLines() {
-  const container = document.getElementById('c-lines-container');
-  if(!container) return;
-  container.innerHTML = tempManualLines.map((l,i)=>`
-    <div class="line-block"><button onclick="removeManualLine(${i})">✕</button>
-    <input value="${escapeAttr(l.speaker)}" oninput="tempManualLines[${i}].speaker=this.value" placeholder="Speaker">
-    <select onchange="tempManualLines[${i}].role=this.value"><option ${l.role==='pm'?'selected':''}>pm</option><option ${l.role==='dev'?'selected':''}>dev</option><option ${l.role==='client'?'selected':''}>client</option></select>
-    <textarea oninput="tempManualLines[${i}].text=this.value">${escapeHtml(l.text)}</textarea></div>`).join('');
-}
-function addManualLine() { tempManualLines.push({speaker:'PM',role:'pm',text:''}); renderManualLines(); }
-function removeManualLine(i) { tempManualLines.splice(i,1); renderManualLines(); }
-function populateGroupSelects() {
-  const opts = `<option value="">— No group —</option>` + GROUPS.map(g=>`<option value="${g.id}">${g.label}</option>`).join('');
-  const sel = document.getElementById('c-group');
-  if(sel) sel.innerHTML = opts;
-}
-function resolveGroup(selId, newgroupId) {
-  const selVal = document.getElementById(selId)?.value;
-  const newVal = document.getElementById(newgroupId)?.value.trim();
-  if(newVal) {
-    let existing = GROUPS.find(g=>g.label.toLowerCase()===newVal.toLowerCase());
-    if(existing) return existing.id;
-    const newId = 'g'+Date.now();
-    GROUPS.push({id:newId, label:newVal, icon:'📁'});
-    return newId;
-  }
-  return selVal || null;
-}
-function saveManualScenario() {
-  const title = document.getElementById('c-title').value.trim();
-  if(!title) return alert('Enter title');
-  const lines = tempManualLines.filter(l=>l.text.trim()).map(l=>({...l,muted:false}));
-  if(!lines.length) return alert('Add at least one line');
-  const vocab = (document.getElementById('c-vocab').value||'').split(',').map(v=>v.trim()).filter(Boolean);
-  const level = document.getElementById('c-level').value;
-  const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
-  const icon = document.getElementById('c-icon').value.trim()||'📝';
-  const sub = document.getElementById('c-sub').value.trim();
-  const tip = document.getElementById('c-tip').value.trim()||'Practice';
-  const iconBg = {Beginner:'#edf7e3',Intermediate:'#deeeff',Advanced:'#fde8e8'}[level]||'#deeeff';
-  const groupId = resolveGroup('c-group','c-newgroup');
-  const editingId = document.getElementById('editing-scenario-id').value;
-  if(editingId) {
-    const idx = SCENARIOS.findIndex(s=>s.id===editingId);
-    if(idx!==-1) SCENARIOS[idx] = {...SCENARIOS[idx], groupId, title, sub, icon, iconBg, level, levelColor:ls.color, levelBg:ls.bg, vocab, lines, tip };
-  } else {
-    SCENARIOS.push({ id:'c'+Date.now(), groupId, title, sub, icon, iconBg, level, levelColor:ls.color, levelBg:ls.bg, vocab, lines, tip });
-  }
-  persistScenarios();
-  closeCreateModal();
-  renderScenarioGrid();
-  if(!editingId) loadScenario(SCENARIOS[SCENARIOS.length-1].id);
-  else loadScenario(editingId);
-}
-
-// ========== AI GEMINI ==========
-// Lấy API key từ localStorage (do người dùng tự nhập), không lưu trong code
-function getGeminiApiKey() {
-    return localStorage.getItem('gemini_api_key');
-}
-
-function setGeminiApiKey(key) {
-    localStorage.setItem('gemini_api_key', key);
-}
-
-// Hiển thị prompt yêu cầu nhập key nếu chưa có
+// ========== AI GEMINI (key lưu trong localStorage) ==========
+function getGeminiApiKey() { return localStorage.getItem('gemini_api_key'); }
+function setGeminiApiKey(key) { localStorage.setItem('gemini_api_key', key); }
 function promptForApiKey() {
-    const key = prompt(
-        '🔑 Please enter your Gemini API key.\n\n' +
-        'You can get a free key from: https://aistudio.google.com/apikey\n\n' +
-        'Your key will be stored locally in your browser only.'
-    );
-    if (key && key.trim()) {
-        setGeminiApiKey(key.trim());
-        return key.trim();
-    }
-    return null;
+  const key = prompt(
+    '🔑 Enter your Gemini API key\n\nGet free key: https://aistudio.google.com/apikey\n\nKey will be stored in your browser only.'
+  );
+  if (key && key.trim()) { setGeminiApiKey(key.trim()); return key.trim(); }
+  return null;
 }
-
-async function callGemini(systemPrompt, userPrompt) {
-    let apiKey = getGeminiApiKey();
-    if (!apiKey) {
-        apiKey = promptForApiKey();
-        if (!apiKey) throw new Error('API key is required to use AI generation.');
+async function callGemini(system, user) {
+  let apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    apiKey = promptForApiKey();
+    if (!apiKey) throw new Error('API key required');
+  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: `${system}\n\n${user}` }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }
+    })
+  });
+  if (!resp.ok) {
+    if (resp.status === 403 || resp.status === 401) {
+      localStorage.removeItem('gemini_api_key');
+      throw new Error('Invalid API key. Please re-enter.');
     }
-    
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    const requestBody = {
-        contents: [{
-            role: "user",
-            parts: [{ text: `${systemPrompt}\n\nUser request: ${userPrompt}` }]
-        }],
-        generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-        }
-    };
-    
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-    });
-    
-    if (!response.ok) {
-        let errorMsg = `HTTP ${response.status}`;
-        try {
-            const errData = await response.json();
-            errorMsg = errData.error?.message || errorMsg;
-        } catch(e) {}
-        
-        // Nếu lỗi liên quan đến key, xóa key cũ và yêu cầu nhập lại
-        if (response.status === 403 || response.status === 401) {
-            localStorage.removeItem('gemini_api_key');
-            throw new Error(`Invalid API key: ${errorMsg}. Please re-enter your key.`);
-        }
-        throw new Error(`Gemini API error: ${errorMsg}`);
-    }
-    
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (!rawText) throw new Error('Empty response from Gemini');
-    
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    try {
-        return JSON.parse(clean);
-    } catch(e) {
-        console.error('Failed to parse JSON:', clean);
-        throw new Error('Invalid JSON response from AI');
-    }
+    throw new Error(`API error: ${resp.status}`);
+  }
+  const data = await resp.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 }
-
 async function generateAiScenario() {
-    const prompt = document.getElementById('ai-prompt-text').value.trim();
-    if (!prompt) return alert('Please describe the situation.');
-    const level = document.getElementById('ai-level-gen').value;
-    const numLines = parseInt(document.getElementById('ai-lines-num').value);
-    const preview = document.getElementById('ai-preview-area');
-    preview.innerHTML = '<span class="wsm-loading">🤖 Generating with Gemini...</span>';
-    
-    const systemPrompt = `You are a business English content creator for project managers.
-Generate a realistic workplace dialogue scenario based on the user's description.
-Reply ONLY with a valid JSON object — no markdown, no preamble, no explanation.
-JSON structure:
-{
-  "title": "short English title",
-  "sub": "one-line English subtitle",
-  "icon": "single emoji",
-  "level": "${level}",
-  "vocab": ["word1","word2","word3","word4","word5","word6"],
-  "tip": "one concise PM language tip using <strong> tags for key phrases",
-  "lines": [
-    {"speaker":"PM","role":"pm","text":"..."},
-    {"speaker":"Client","role":"client","text":"..."}
-  ]
+  const prompt = document.getElementById('ai-prompt-text').value.trim();
+  if (!prompt) return alert('Describe situation');
+  const level = document.getElementById('ai-level-gen').value;
+  const numLines = parseInt(document.getElementById('ai-lines-num').value);
+  const preview = document.getElementById('ai-preview-area');
+  preview.innerHTML = '<span>🤖 Generating...</span>';
+  const system = `Generate JSON dialogue: title, sub, icon, level:${level}, vocab array (6-10 words), tip, lines array exactly ${numLines} lines with speaker,role,text. No markdown.`;
+  try {
+    const gen = await callGemini(system, prompt);
+    window._aiTemp = gen;
+    preview.innerHTML = `<pre style="background:#f0f0f0;padding:8px;border-radius:8px">${JSON.stringify(gen,null,2)}</pre><button class="btn-save" onclick="saveAiGeneratedScenario()">✅ Save</button>`;
+  } catch(e) { preview.innerHTML = `<span style="color:red">❌ ${e.message}</span>`; }
 }
-Rules:
-- Exactly ${numLines} lines in the dialogue
-- roles must be one of: pm, dev, client
-- vocab: 6-10 key business/PM phrases from the dialogue
-- All dialogue must be natural, professional English at ${level} level
-- tip must reference specific phrases from the dialogue`;
-
-    try {
-        const generated = await callGemini(systemPrompt, prompt);
-        window._aiTemp = generated;
-        preview.innerHTML = `<pre style="white-space:pre-wrap; font-size:12px; background:#f0f4fa; padding:12px; border-radius:12px;">${JSON.stringify(generated, null, 2)}</pre>
-        <button class="btn-save" onclick="saveAiGeneratedScenario()" style="margin-top:12px;">✅ Save this scenario</button>`;
-    } catch (err) {
-        preview.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
-        console.error(err);
-    }
-}
-
 async function generateByKeyword() {
-    const keyword = document.getElementById('keyword-input').value.trim();
-    if (!keyword) return alert('Please enter a keyword or topic.');
-    const level = document.getElementById('keyword-level').value;
-    const numLines = parseInt(document.getElementById('keyword-lines').value);
-    const preview = document.getElementById('keyword-preview-area');
-    preview.innerHTML = '<span class="wsm-loading">🤖 Generating with Gemini...</span>';
-    
-    const systemPrompt = `You are a business English content creator for project managers.
-Create a professional business English dialogue based on the keyword: "${keyword}".
-Reply ONLY with a valid JSON object — no markdown, no preamble.
-Level: ${level}. Exactly ${numLines} lines.
-JSON structure same as above.`;
-
-    try {
-        const generated = await callGemini(systemPrompt, `Topic: ${keyword}`);
-        window._aiTemp = generated;
-        preview.innerHTML = `<pre style="white-space:pre-wrap; font-size:12px; background:#f0f4fa; padding:12px; border-radius:12px;">${JSON.stringify(generated, null, 2)}</pre>
-        <button class="btn-save" onclick="saveAiGeneratedScenario()" style="margin-top:12px;">✅ Save this scenario</button>`;
-    } catch (err) {
-        preview.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
-        console.error(err);
-    }
+  const kw = document.getElementById('keyword-input').value.trim();
+  if (!kw) return alert('Enter keyword');
+  const level = document.getElementById('keyword-level').value;
+  const numLines = parseInt(document.getElementById('keyword-lines').value);
+  const preview = document.getElementById('keyword-preview-area');
+  preview.innerHTML = '<span>🤖 Generating...</span>';
+  try {
+    const gen = await callGemini(`Create dialogue about ${kw}, level ${level}, ${numLines} lines, JSON only.`, kw);
+    window._aiTemp = gen;
+    preview.innerHTML = `<pre style="background:#f0f0f0;padding:8px;border-radius:8px">${JSON.stringify(gen,null,2)}</pre><button class="btn-save" onclick="saveAiGeneratedScenario()">✅ Save</button>`;
+  } catch(e) { preview.innerHTML = `<span style="color:red">❌ ${e.message}</span>`; }
 }
-
 function saveAiGeneratedScenario() {
-    if (!window._aiTemp) return;
-    const gen = window._aiTemp;
-    const level = gen.level || 'Intermediate';
-    const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
-    const iconBg = { Beginner: '#edf7e3', Intermediate: '#deeeff', Advanced: '#fde8e8' }[level] || '#deeeff';
-    const groupId = resolveGroup('c-group', 'c-newgroup');
-    const newScenario = {
-        id: 'ai_' + Date.now(),
-        groupId: groupId,
-        title: gen.title,
-        sub: gen.sub,
-        icon: gen.icon || '🤖',
-        iconBg: iconBg,
-        level: level,
-        levelColor: ls.color,
-        levelBg: ls.bg,
-        vocab: gen.vocab || [],
-        lines: gen.lines.map(l => ({ ...l, muted: false })),
-        tip: gen.tip || ''
-    };
-    SCENARIOS.push(newScenario);
-    persistScenarios();
-    renderScenarioGrid();
-    closeCreateModal();
-    loadScenario(newScenario.id);
+  if (!window._aiTemp) return;
+  const gen = window._aiTemp;
+  const level = gen.level || 'Intermediate';
+  const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
+  const iconBg = { Beginner: '#edf7e3', Intermediate: '#deeeff', Advanced: '#fde8e8' }[level] || '#deeeff';
+  const groupId = null; // không cho chọn group lúc này, có thể set sau
+  const newScenario = {
+    id: 'ai_' + Date.now(),
+    groupId: groupId,
+    title: gen.title,
+    sub: gen.sub,
+    icon: gen.icon || '🤖',
+    iconBg: iconBg,
+    level: level,
+    levelColor: ls.color,
+    levelBg: ls.bg,
+    vocab: gen.vocab || [],
+    lines: gen.lines.map(l => ({ ...l, muted: false })),
+    tip: gen.tip || ''
+  };
+  SCENARIOS.push(newScenario);
+  persistScenarios();
+  renderScenarioGrid();
+  closeCreateModal();
+  loadScenario(newScenario.id);
 }
 
 // ========== IMPORT PASTE ==========
@@ -404,13 +252,17 @@ function importParsedDialogue() {
   const raw = document.getElementById('paste-dialogue').value;
   const lines = raw.split(/\r?\n/).filter(l=>l.trim()).map(l=>{
     const m = l.match(/^([^:：]+)[:：]\s*(.+)/);
-    if(m) return { speaker:m[1].trim(), role:m[1].toLowerCase().includes('dev')?'dev':(m[1].toLowerCase().includes('client')?'client':'pm'), text:m[2].trim(), muted:false };
+    if (m) return { speaker: m[1].trim(), role: m[1].toLowerCase().includes('dev')?'dev':(m[1].toLowerCase().includes('client')?'client':'pm'), text: m[2].trim(), muted: false };
     return null;
   }).filter(l=>l);
-  if(!lines.length) return alert('Invalid format. Use "Speaker: text"');
-  const title = document.getElementById('import-title').value.trim() || 'Imported';
-  const newId = 'imp_'+Date.now();
-  SCENARIOS.push({ id:newId, groupId:null, title, sub:'', icon:'📄', iconBg:'#deeeff', level:'Intermediate', vocab:[], tip:'', lines });
+  if (!lines.length) return alert('Invalid format. Use "Speaker: text"');
+  const title = document.getElementById('import-title').value.trim() || 'Imported Dialogue';
+  const newId = 'imp_' + Date.now();
+  const newScenario = {
+    id: newId, groupId: null, title: title, sub: '', icon: '📄', iconBg: '#deeeff',
+    level: 'Intermediate', vocab: [], tip: '', lines: lines
+  };
+  SCENARIOS.push(normalizeScenario(newScenario));
   persistScenarios();
   renderScenarioGrid();
   closeImportModal();
@@ -421,27 +273,27 @@ function importParsedDialogue() {
 function setupSelectionListener() {
   document.addEventListener('mouseup', e => {
     const popup = document.getElementById('save-popup');
-    if(popup.contains(e.target)) return;
+    if (popup.contains(e.target)) return;
     const sel = window.getSelection();
     const txt = sel?.toString().trim();
-    if(!txt || txt.length<2) { popup.classList.remove('vis'); return; }
+    if (!txt || txt.length < 2) { popup.classList.remove('vis'); return; }
     const node = sel.anchorNode?.parentElement;
-    if(!node?.closest('.dlg')) { popup.classList.remove('vis'); return; }
+    if (!node?.closest('.dlg')) { popup.classList.remove('vis'); return; }
     const range = sel.getRangeAt(0), rect = range.getBoundingClientRect();
-    popup.style.top = (rect.bottom+window.scrollY+6)+'px';
-    popup.style.left = Math.max(8, rect.left+window.scrollX-10)+'px';
+    popup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+    popup.style.left = Math.max(8, rect.left + window.scrollX - 10) + 'px';
     popup.classList.add('vis');
     const bubble = node.closest('.dbub');
-    window.pendingCtx = bubble ? bubble.innerText.replace(/^[A-Z]{2,}\n/,'').trim() : '';
+    window.pendingCtx = bubble ? bubble.innerText.replace(/^[A-Z]{2,}\n/, '').trim() : '';
     window.pendingWord = txt;
     document.getElementById('sp-save-btn').onclick = () => { popup.classList.remove('vis'); openWordModal(window.pendingWord, window.pendingCtx); };
     document.getElementById('sp-look-btn').onclick = () => { popup.classList.remove('vis'); openWordModal(window.pendingWord, window.pendingCtx, true); };
   });
 }
-function escapeHtml(str) { return str?.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])) || ''; }
+function escapeHtml(str) { return str?.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])) || ''; }
 function escapeAttr(str) { return str?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') || ''; }
 
-// Export toàn bộ ra window
+// Export
 window.renderScenarioGrid = renderScenarioGrid;
 window.loadScenario = loadScenario;
 window.setGroupFilter = setGroupFilter;
@@ -449,11 +301,6 @@ window.resetGroupFilter = resetGroupFilter;
 window.toggleLineCompletion = toggleLineCompletion;
 window.editScenario = editScenario;
 window.deleteScenarioConfirm = deleteScenarioConfirm;
-window.openCreateModal = openCreateModal;
-window.closeCreateModal = closeCreateModal;
-window.switchCreateTab = switchCreateTab;
-window.addManualLine = addManualLine;
-window.removeManualLine = removeManualLine;
 window.openImportTextModal = openImportTextModal;
 window.closeImportModal = closeImportModal;
 window.importParsedDialogue = importParsedDialogue;
@@ -461,11 +308,13 @@ window.toggleVocab = toggleVocab;
 window.saveAiGeneratedScenario = saveAiGeneratedScenario;
 window.setupSelectionListener = setupSelectionListener;
 window.loadCompletionData = loadCompletionData;
-window.saveCompletion = saveCompletion;
+window.generateAiScenario = generateAiScenario;
+window.generateByKeyword = generateByKeyword;
 
-// Gắn sự kiện AI sau khi DOM load
+// Gắn sự kiện cho nút AI sau khi DOM load
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('trigger-ai-gen')?.addEventListener('click', generateAiScenario);
-  document.getElementById('trigger-keyword-gen')?.addEventListener('click', generateByKeyword);
-  document.getElementById('final-save-scenario')?.addEventListener('click', saveManualScenario);
+  const btnAi = document.getElementById('trigger-ai-gen');
+  if (btnAi) btnAi.addEventListener('click', generateAiScenario);
+  const btnKw = document.getElementById('trigger-keyword-gen');
+  if (btnKw) btnKw.addEventListener('click', generateByKeyword);
 });

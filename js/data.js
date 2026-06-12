@@ -95,7 +95,7 @@ async function loadScenarios() {
   for (const fn of SCENARIO_FILES) {
     try {
       // Đường dẫn tương đối từ index.html
-      const res = await fetch(`./scenarios/${fn}`);
+      const res = await fetch(`/scenarios/${fn}`);
       if (!res.ok) {
         console.warn(`Failed to fetch ${fn}: ${res.status}`);
         continue;

@@ -1,5 +1,5 @@
 // js/main.js
-const ACCESS_CODE = 'pmenglish2025'; // 👈 Đổi mã theo ý bạn
+const ACCESS_CODE = '12345678'; // 👈 Đổi mã theo ý bạn
 
 function checkAccess() {
   const granted = sessionStorage.getItem('access_granted');

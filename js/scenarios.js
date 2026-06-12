@@ -226,70 +226,175 @@ function saveManualScenario() {
 }
 
 // ========== AI GEMINI ==========
-// Định nghĩa biến toàn cục để chứa API Key
-let GEMINI_API_KEY = null;
+// Lấy API key từ localStorage (do người dùng tự nhập), không lưu trong code
+function getGeminiApiKey() {
+    return localStorage.getItem('gemini_api_key');
+}
 
-// Hàm để lấy API Key từ biến toàn cục hoặc từ file config đã được inject
-function loadGeminiApiKey() {
-    if (GEMINI_API_KEY) return GEMINI_API_KEY;
-    // Kiểm tra xem file api-key.js đã được tạo và chạy chưa
-    if (typeof window !== 'undefined' && window.GEMINI_API_KEY) {
-        GEMINI_API_KEY = window.GEMINI_API_KEY;
-        return GEMINI_API_KEY;
+function setGeminiApiKey(key) {
+    localStorage.setItem('gemini_api_key', key);
+}
+
+// Hiển thị prompt yêu cầu nhập key nếu chưa có
+function promptForApiKey() {
+    const key = prompt(
+        '🔑 Please enter your Gemini API key.\n\n' +
+        'You can get a free key from: https://aistudio.google.com/apikey\n\n' +
+        'Your key will be stored locally in your browser only.'
+    );
+    if (key && key.trim()) {
+        setGeminiApiKey(key.trim());
+        return key.trim();
     }
-    // Fallback cho trường hợp dev local (nếu cần)
-    console.warn("API key not found. Please ensure GEMINI_API_KEY is defined.");
     return null;
 }
 
-// Sửa lại hàm callGemini để dùng API key từ hàm load
-async function callGemini(system, user) {
-    const apiKey = loadGeminiApiKey();
+async function callGemini(systemPrompt, userPrompt) {
+    let apiKey = getGeminiApiKey();
     if (!apiKey) {
-        throw new Error('Gemini API key is missing. Please check your deployment configuration.');
+        apiKey = promptForApiKey();
+        if (!apiKey) throw new Error('API key is required to use AI generation.');
     }
+    
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const requestBody = {
+        contents: [{
+            role: "user",
+            parts: [{ text: `${systemPrompt}\n\nUser request: ${userPrompt}` }]
+        }],
+        generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+        }
+    };
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+            const errData = await response.json();
+            errorMsg = errData.error?.message || errorMsg;
+        } catch(e) {}
+        
+        // Nếu lỗi liên quan đến key, xóa key cũ và yêu cầu nhập lại
+        if (response.status === 403 || response.status === 401) {
+            localStorage.removeItem('gemini_api_key');
+            throw new Error(`Invalid API key: ${errorMsg}. Please re-enter your key.`);
+        }
+        throw new Error(`Gemini API error: ${errorMsg}`);
+    }
+    
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!rawText) throw new Error('Empty response from Gemini');
+    
+    const clean = rawText.replace(/```json|```/g, '').trim();
+    try {
+        return JSON.parse(clean);
+    } catch(e) {
+        console.error('Failed to parse JSON:', clean);
+        throw new Error('Invalid JSON response from AI');
+    }
 }
+
 async function generateAiScenario() {
-  const prompt = document.getElementById('ai-prompt-text').value.trim();
-  if(!prompt) return alert('Describe situation');
-  const level = document.getElementById('ai-level-gen').value;
-  const numLines = parseInt(document.getElementById('ai-lines-num').value);
-  const preview = document.getElementById('ai-preview-area');
-  preview.innerHTML = '<span>Generating...</span>';
-  const system = `Generate JSON dialogue: title, sub, icon, level:${level}, vocab array, tip, lines array exactly ${numLines} lines with speaker,role,text. No markdown.`;
-  try {
-    const gen = await callGemini(system, prompt);
-    window._aiTemp = gen;
-    preview.innerHTML = `<pre>${JSON.stringify(gen,null,2)}</pre><button class="btn-save" onclick="saveAiGeneratedScenario()">✅ Save</button>`;
-  } catch(e) { preview.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }
+    const prompt = document.getElementById('ai-prompt-text').value.trim();
+    if (!prompt) return alert('Please describe the situation.');
+    const level = document.getElementById('ai-level-gen').value;
+    const numLines = parseInt(document.getElementById('ai-lines-num').value);
+    const preview = document.getElementById('ai-preview-area');
+    preview.innerHTML = '<span class="wsm-loading">🤖 Generating with Gemini...</span>';
+    
+    const systemPrompt = `You are a business English content creator for project managers.
+Generate a realistic workplace dialogue scenario based on the user's description.
+Reply ONLY with a valid JSON object — no markdown, no preamble, no explanation.
+JSON structure:
+{
+  "title": "short English title",
+  "sub": "one-line English subtitle",
+  "icon": "single emoji",
+  "level": "${level}",
+  "vocab": ["word1","word2","word3","word4","word5","word6"],
+  "tip": "one concise PM language tip using <strong> tags for key phrases",
+  "lines": [
+    {"speaker":"PM","role":"pm","text":"..."},
+    {"speaker":"Client","role":"client","text":"..."}
+  ]
 }
+Rules:
+- Exactly ${numLines} lines in the dialogue
+- roles must be one of: pm, dev, client
+- vocab: 6-10 key business/PM phrases from the dialogue
+- All dialogue must be natural, professional English at ${level} level
+- tip must reference specific phrases from the dialogue`;
+
+    try {
+        const generated = await callGemini(systemPrompt, prompt);
+        window._aiTemp = generated;
+        preview.innerHTML = `<pre style="white-space:pre-wrap; font-size:12px; background:#f0f4fa; padding:12px; border-radius:12px;">${JSON.stringify(generated, null, 2)}</pre>
+        <button class="btn-save" onclick="saveAiGeneratedScenario()" style="margin-top:12px;">✅ Save this scenario</button>`;
+    } catch (err) {
+        preview.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
+        console.error(err);
+    }
+}
+
 async function generateByKeyword() {
-  const kw = document.getElementById('keyword-input').value.trim();
-  if(!kw) return alert('Enter keyword');
-  const level = document.getElementById('keyword-level').value;
-  const numLines = parseInt(document.getElementById('keyword-lines').value);
-  const preview = document.getElementById('keyword-preview-area');
-  preview.innerHTML = '<span>Generating...</span>';
-  try {
-    const gen = await callGemini(`Create dialogue about ${kw}, level ${level}, ${numLines} lines, JSON only.`, kw);
-    window._aiTemp = gen;
-    preview.innerHTML = `<pre>${JSON.stringify(gen,null,2)}</pre><button class="btn-save" onclick="saveAiGeneratedScenario()">✅ Save</button>`;
-  } catch(e) { preview.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }
+    const keyword = document.getElementById('keyword-input').value.trim();
+    if (!keyword) return alert('Please enter a keyword or topic.');
+    const level = document.getElementById('keyword-level').value;
+    const numLines = parseInt(document.getElementById('keyword-lines').value);
+    const preview = document.getElementById('keyword-preview-area');
+    preview.innerHTML = '<span class="wsm-loading">🤖 Generating with Gemini...</span>';
+    
+    const systemPrompt = `You are a business English content creator for project managers.
+Create a professional business English dialogue based on the keyword: "${keyword}".
+Reply ONLY with a valid JSON object — no markdown, no preamble.
+Level: ${level}. Exactly ${numLines} lines.
+JSON structure same as above.`;
+
+    try {
+        const generated = await callGemini(systemPrompt, `Topic: ${keyword}`);
+        window._aiTemp = generated;
+        preview.innerHTML = `<pre style="white-space:pre-wrap; font-size:12px; background:#f0f4fa; padding:12px; border-radius:12px;">${JSON.stringify(generated, null, 2)}</pre>
+        <button class="btn-save" onclick="saveAiGeneratedScenario()" style="margin-top:12px;">✅ Save this scenario</button>`;
+    } catch (err) {
+        preview.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
+        console.error(err);
+    }
 }
+
 function saveAiGeneratedScenario() {
-  if(!window._aiTemp) return;
-  const gen = window._aiTemp;
-  const level = gen.level || 'Intermediate';
-  const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
-  const iconBg = {Beginner:'#edf7e3',Intermediate:'#deeeff',Advanced:'#fde8e8'}[level];
-  const groupId = resolveGroup('c-group','c-newgroup');
-  const newScenario = { id:'ai_'+Date.now(), groupId, title:gen.title, sub:gen.sub, icon:gen.icon||'🤖', iconBg, level, levelColor:ls.color, levelBg:ls.bg, vocab:gen.vocab||[], lines:gen.lines.map(l=>({...l,muted:false})), tip:gen.tip||'' };
-  SCENARIOS.push(newScenario);
-  persistScenarios();
-  renderScenarioGrid();
-  closeCreateModal();
-  loadScenario(newScenario.id);
+    if (!window._aiTemp) return;
+    const gen = window._aiTemp;
+    const level = gen.level || 'Intermediate';
+    const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
+    const iconBg = { Beginner: '#edf7e3', Intermediate: '#deeeff', Advanced: '#fde8e8' }[level] || '#deeeff';
+    const groupId = resolveGroup('c-group', 'c-newgroup');
+    const newScenario = {
+        id: 'ai_' + Date.now(),
+        groupId: groupId,
+        title: gen.title,
+        sub: gen.sub,
+        icon: gen.icon || '🤖',
+        iconBg: iconBg,
+        level: level,
+        levelColor: ls.color,
+        levelBg: ls.bg,
+        vocab: gen.vocab || [],
+        lines: gen.lines.map(l => ({ ...l, muted: false })),
+        tip: gen.tip || ''
+    };
+    SCENARIOS.push(newScenario);
+    persistScenarios();
+    renderScenarioGrid();
+    closeCreateModal();
+    loadScenario(newScenario.id);
 }
 
 // ========== IMPORT PASTE ==========

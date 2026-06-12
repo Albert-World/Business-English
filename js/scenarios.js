@@ -226,7 +226,7 @@ function saveManualScenario() {
 }
 
 // ========== AI GEMINI ==========
-const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
+const GEMINI_API_KEY = AQ.Ab8RN6KbdCgXbro5fE0VoW85Vu8nP0oiZD-iFpUi3dcKbrKuyQ;
 async function callGemini(system, user) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
   const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contents:[{ role:'user', parts:[{ text:`${system}\n\n${user}` }] }], generationConfig:{ temperature:0.7 } }) });

@@ -1,380 +1,351 @@
-/* ═══════════════════════════
-   PM English — scenarios.js
-   Scenario CRUD + AI generate
-   ═══════════════════════════ */
-
-/* Runtime scenario list (populated after MD load) */
-// SCENARIOS defined in data.js
-
+// js/scenarios.js
 const ROLES = {
-  pm:     { label: 'PM',  dot: '#2176c7', avBg: '#b8d8f8', avColor: '#042C53' },
-  dev:    { label: 'Dev', dot: '#3b8a16', avBg: '#bfe0a0', avColor: '#173404' },
-  client: { label: 'CL',  dot: '#c47d18', avBg: '#f5d49a', avColor: '#412402' },
+  pm: { label: 'PM', dot: '#2176c7', avBg: '#b8d8f8', avColor: '#042C53' },
+  dev: { label: 'Dev', dot: '#3b8a16', avBg: '#bfe0a0', avColor: '#173404' },
+  client: { label: 'CL', dot: '#c47d18', avBg: '#f5d49a', avColor: '#412402' },
 };
 window.ROLES = ROLES;
 
 const LEVEL_S = {
-  Beginner:     { color: '#3b6d11', bg: '#edf7e3', border: 'rgba(59,109,17,.2)' },
+  Beginner: { color: '#3b6d11', bg: '#edf7e3', border: 'rgba(59,109,17,.2)' },
   Intermediate: { color: '#1a65ad', bg: '#deeeff', border: 'rgba(26,101,173,.2)' },
-  Advanced:     { color: '#a32d2d', bg: '#fde8e8', border: 'rgba(163,45,45,.2)' },
+  Advanced: { color: '#a32d2d', bg: '#fde8e8', border: 'rgba(163,45,45,.2)' },
 };
 
 let activeVocab = new Set();
-let modalLines = [];
-let aiGeneratedData = null;
+let currentViewMode = 'list';
+let currentGroupFilter = 'all';
+let scenarioCompletionMap = {};
+let tempManualLines = [];
 
-/* ── Sidebar ── */
-function renderSidebar() {
-  const total = SCENARIOS.length;
-  document.getElementById('sc-pill').textContent = total + ' scenarios';
-
-  const groupedIds = new Set(GROUPS.map(g => g.id));
-  const ungrouped = SCENARIOS.filter(s => !s.groupId || !groupedIds.has(s.groupId));
-
-  let html = '';
-  GROUPS.forEach(g => {
-    const items = SCENARIOS.filter(s => s.groupId === g.id);
-    if (!items.length) return;
-    const isOpen = items.some(s => s.id === window._currentScenario?.id);
-    html += `<div class="sb-group">
-      <div class="sb-group-hd" onclick="toggleGroup('grp-${g.id}')">
-        <span class="sb-group-label"><span class="sb-group-ico">${g.icon}</span>${g.label} <span style="font-size:10px;color:var(--text3);font-weight:400">(${items.length})</span></span>
-        <span class="sb-group-arrow ${isOpen ? 'open' : ''}" id="arrow-grp-${g.id}">▶</span>
-      </div>
-      <div class="sb-group-items ${isOpen ? 'open' : ''}" id="grp-${g.id}">
-        ${items.map(s => sbItem(s)).join('')}
-      </div>
-    </div>`;
+// ========== COMPLETION ==========
+function loadCompletionData() {
+  const stored = localStorage.getItem('be_scenario_progress');
+  scenarioCompletionMap = stored ? JSON.parse(stored) : {};
+  SCENARIOS.forEach(s => {
+    if (!scenarioCompletionMap[s.id])
+      scenarioCompletionMap[s.id] = new Array(s.lines.length).fill(false);
   });
+}
+function saveCompletion() {
+  localStorage.setItem('be_scenario_progress', JSON.stringify(scenarioCompletionMap));
+}
+function getCompletionPercent(scenario) {
+  const comp = scenarioCompletionMap[scenario.id] || new Array(scenario.lines.length).fill(false);
+  const done = comp.filter(v => v === true).length;
+  return Math.round((done / scenario.lines.length) * 100) || 0;
+}
+function toggleLineCompletion(scenarioId, lineIdx) {
+  if (!scenarioCompletionMap[scenarioId])
+    scenarioCompletionMap[scenarioId] = new Array(SCENARIOS.find(s => s.id === scenarioId).lines.length).fill(false);
+  scenarioCompletionMap[scenarioId][lineIdx] = !scenarioCompletionMap[scenarioId][lineIdx];
+  saveCompletion();
+  const scenario = SCENARIOS.find(s => s.id === scenarioId);
+  if (getCompletionPercent(scenario) === 100) showAchievement(`🎉 Amazing! You mastered "${scenario.title}"! 🌟`, '🎯');
+  if (window._currentScenario?.id === scenarioId) renderDetailView(window._currentScenario);
+  if (currentViewMode === 'list') renderScenarioGrid();
+}
+function showAchievement(msg, emoji) {
+  const toast = document.createElement('div');
+  toast.className = 'achievement-toast';
+  toast.innerHTML = `<span style="font-size:1.8rem">${emoji || '🏆'}</span><span>${msg}</span><span style="font-size:1.2rem">✨</span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
 
-  if (ungrouped.length) {
-    html += `<div class="sb-hd" style="margin-top:4px">Other</div>`;
-    html += ungrouped.map(s => sbItem(s)).join('');
+// ========== RENDER GRID ==========
+function renderScenarioGrid() {
+  let filtered = SCENARIOS.filter(s => currentGroupFilter === 'all' ? true : s.groupId === currentGroupFilter);
+  const html = `<div class="filter-bar"><div class="filter-group" id="filter-group-buttons"></div><div><button class="filter-chip" onclick="resetGroupFilter()">All</button></div></div><div class="scenario-grid" id="scenario-grid-container"></div>`;
+  document.getElementById('dynamic-content').innerHTML = html;
+  const filterDiv = document.getElementById('filter-group-buttons');
+  filterDiv.innerHTML = GROUPS.map(g => `<button class="filter-chip ${currentGroupFilter === g.id ? 'active' : ''}" onclick="setGroupFilter('${g.id}')">${g.icon} ${g.label}</button>`).join('');
+  const grid = document.getElementById('scenario-grid-container');
+  if (!filtered.length) grid.innerHTML = '<div class="empty-state">📭 No scenarios. Create one!</div>';
+  else {
+    grid.innerHTML = filtered.map(s => {
+      const percent = getCompletionPercent(s);
+      return `<div class="scenario-card" onclick="loadScenario('${s.id}')">
+        <div class="card-icon" style="background:${s.iconBg || '#deeeff'}">${s.icon}</div>
+        <div class="card-info"><div class="card-title">${escapeHtml(s.title)}</div><div class="card-sub">${escapeHtml(s.sub)}</div>
+        <div class="card-meta"><span class="level-badge">${s.level}</span><div class="progress-mini"><div class="progress-mini-fill" style="width:${percent}%"></div></div><span>${percent}%</span></div></div>
+      </div>`;
+    }).join('');
   }
-
-  document.getElementById('scenario-list').innerHTML = html;
+  currentViewMode = 'list';
+  document.getElementById('sc-pill').textContent = SCENARIOS.length + ' scenarios';
 }
+function setGroupFilter(g) { currentGroupFilter = g; renderScenarioGrid(); }
+function resetGroupFilter() { currentGroupFilter = 'all'; renderScenarioGrid(); }
 
-function sbItem(s) {
-  return `<div class="sb-item ${window._currentScenario?.id === s.id ? 'on' : ''}" onclick="loadScenario('${s.id}')">
-    <div class="sb-ico" style="background:${s.iconBg}">${s.icon}</div>
-    <div>
-      <div class="sb-name">${s.title}</div>
-      <div class="sb-sub">${s.sub}</div>
-    </div>
-  </div>`;
-}
-
-function toggleGroup(id) {
-  const el = document.getElementById(id);
-  const arrow = document.getElementById('arrow-' + id);
-  if (!el) return;
-  el.classList.toggle('open');
-  arrow && arrow.classList.toggle('open');
-}
-
-/* ── Load & render scenario ── */
+// ========== LOAD & DETAIL ==========
 function loadScenario(id) {
   stopAudio();
-  activeVocab = new Set();
   window._currentScenario = SCENARIOS.find(s => s.id === id);
-  renderSidebar();
-  renderCard();
+  if (!window._currentScenario) return;
+  activeVocab.clear();
+  currentViewMode = 'detail';
+  renderDetailView(window._currentScenario);
 }
-
-function renderCard() {
-  const s = window._currentScenario;
+function renderDetailView(s) {
   const ls = LEVEL_S[s.level] || LEVEL_S.Intermediate;
-  const voiceOpts = allVoices.length
-    ? allVoices.map((v, i) => `<option value="${i}">${v.name}</option>`).join('')
-    : '<option value="">Default</option>';
-
-  document.getElementById('main-col').innerHTML = `
-    <div class="scard">
-      <div class="scard-hd">
-        <div class="scard-ico" style="background:${s.iconBg}">${s.icon}</div>
-        <div class="scard-meta">
-          <div class="scard-title">${s.title}</div>
-          <div class="scard-sub">${s.sub}</div>
-        </div>
-        <span class="lvl-pill" style="background:${ls.bg};color:${ls.color};border-color:${ls.border}">${s.level}</span>
-      </div>
-      <div class="vocab-bar">
-        <div class="vocab-bar-hd">
-          <span class="vocab-bar-label">📚 Key vocabulary</span>
-          <span class="vocab-bar-hint">Click to highlight · select text to save</span>
-        </div>
-        <div class="chips">${s.vocab.map(v => `<span class="chip ${activeVocab.has(v) ? 'on' : ''}" onclick="toggleVocab(this,'${esc(v)}')">${v}</span>`).join('')}</div>
-      </div>
-      <div class="script">
-        <div class="dlg" id="dlg">${buildDlg(s)}</div>
-      </div>
-      <div class="audio-panel">
-        <div class="ap-title">Voice settings</div>
-        <div class="voice-grid">
-          ${Object.entries(ROLES).map(([role, cfg]) => `
-            <div class="vg-item">
-              <div class="vg-label"><div class="vg-dot" style="background:${cfg.dot}"></div>${cfg.label}</div>
-              <select class="vg-sel" id="vs-${role}" onchange="setVoice('${role}',this.value)">${voiceOpts}</select>
-            </div>`).join('')}
-        </div>
-        <div class="speed-row">
-          <label>Speed</label>
-          <input type="range" min="0.5" max="1.4" step="0.05" value="${speechRate}"
-            oninput="speechRate=parseFloat(this.value);document.getElementById('spd-val').textContent=speechRate.toFixed(2)+'x'">
-          <span class="speed-val" id="spd-val">${speechRate.toFixed(2)}x</span>
-        </div>
-        <div class="audio-actions">
-          <button class="btn btn-play" id="btn-play" onclick="togglePlay()">▶ Play</button>
-          <button class="btn btn-dl" id="btn-dl" onclick="downloadMp3()" disabled>⬇ Download MP3</button>
-          <div class="prog-wrap">
-            <div class="prog-bar"><div class="prog-fill" id="pfill"></div></div>
-            <div class="prog-status" id="pstatus">Press ▶ to listen</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="tip-box">💡 <strong>PM tip:</strong> ${s.tip}</div>
-    <div id="fc-anchor"></div>`;
-
-  setTimeout(() => { refreshVoices(); renderFC(); }, 80);
-}
-
-/* ── Dialogue ── */
-function buildDlg(s) {
-  return s.lines.map((l, i) => {
+  const voiceOpts = allVoices.length ? allVoices.map((v,i)=>`<option value="${i}">${escapeHtml(v.name)}</option>`).join('') : '<option>Default</option>';
+  const percent = getCompletionPercent(s);
+  const completions = scenarioCompletionMap[s.id] || [];
+  let dialogHtml = s.lines.map((l,idx)=>{
     const cfg = ROLES[l.role] || ROLES.pm;
+    const isComp = completions[idx] === true;
     const txt = hlText(l.text, activeVocab);
-    const muted = l.muted === true;
-    const mutedStyle = muted ? 'style="opacity:.45"' : '';
-    const btnColor = cfg.dot;
-    return `<div class="dline ${l.role === 'dev' ? 'r' : ''}" ${mutedStyle}>
-      <div class="dav" style="background:${cfg.avBg};color:${cfg.avColor}">${cfg.label}</div>
-      <div class="dbub ${l.role}">
-        <div class="dspk">${l.speaker}</div>
-        ${txt}
-        <div class="dline-audio">
-          <button class="dline-audio-btn ${muted ? 'muted' : ''}" style="border-color:${btnColor}40;color:${btnColor}"
-            onclick="toggleLineMute(${i})" title="${muted ? 'Unmute' : 'Mute'} this line">
-            ${muted ? '🔇' : '🔊'} ${l.speaker.split(' ')[0]}
-          </button>
-          <button class="dline-audio-btn" style="border-color:${btnColor}40;color:${btnColor}"
-            onclick="playLine(${i})" title="Play this line only">▶</button>
-        </div>
-      </div>
+    return `<div class="dline ${l.role === 'dev' ? 'r' : ''}" style="display:flex; gap:8px">
+      <div class="completion-check" onclick="toggleLineCompletion('${s.id}', ${idx})"><div class="check-circle ${isComp ? 'completed' : ''}">${isComp ? '✓' : ''}</div></div>
+      <div><div class="dav" style="background:${cfg.avBg};color:${cfg.avColor}">${cfg.label}</div>
+      <div class="dbub"><div class="dspk">${escapeHtml(l.speaker)}</div>${txt}<div class="dline-audio"><button class="dline-audio-btn" onclick="playLine(${idx})">▶</button></div></div></div>
     </div>`;
   }).join('');
+  const mainHtml = `<button class="back-btn" onclick="renderScenarioGrid()">← Back</button>
+    <div class="scard"><div class="scard-hd"><div class="scard-ico" style="background:${s.iconBg}">${s.icon}</div>
+    <div class="scard-meta"><div class="scard-title">${escapeHtml(s.title)}</div><div class="scard-sub">${escapeHtml(s.sub)}</div></div>
+    <div class="scard-actions"><button onclick="editScenario('${s.id}')">✏️</button><button onclick="deleteScenarioConfirm('${s.id}')">🗑️</button></div>
+    <span class="lvl-pill" style="background:${ls.bg};color:${ls.color}">${s.level}</span></div>
+    <div class="scenario-progress"><span>Completion: ${percent}%</span><div class="progress-mini" style="width:120px"><div class="progress-mini-fill" style="width:${percent}%; background:green"></div></div></div>
+    <div class="vocab-bar"><div class="chips">${s.vocab.map(v=>`<span class="chip ${activeVocab.has(v)?'on':''}" onclick="toggleVocab(this,'${escapeAttr(v)}')">${escapeHtml(v)}</span>`).join('')}</div></div>
+    <div class="script"><div class="dlg">${dialogHtml}</div></div>
+    <div class="audio-panel" id="audio-panel-placeholder"></div>
+    <div class="tip-box">💡 ${s.tip}</div><div id="fc-anchor"></div></div>`;
+  document.getElementById('dynamic-content').innerHTML = mainHtml;
+  const audioPanel = `<div class="ap-title">Voice</div><div class="voice-grid">${Object.entries(ROLES).map(([role,cfg])=>`<div><label>${cfg.label}</label><select id="vs-${role}" onchange="setVoice('${role}',this.value)">${voiceOpts}</select></div>`).join('')}</div>
+  <div><label>Speed</label><input type="range" min="0.5" max="1.4" step="0.05" value="${speechRate}" oninput="speechRate=this.value;document.getElementById('spd-val').innerText=speechRate"> <span id="spd-val">${speechRate}</span></div>
+  <div><button class="btn-play" onclick="togglePlay()">▶ Play</button><button onclick="downloadMp3()">⬇ MP3</button><div class="prog-bar"><div id="pfill"></div></div><div id="pstatus"></div></div>`;
+  document.querySelector('.audio-panel').innerHTML = audioPanel;
+  refreshVoices();
+  if (typeof renderFC === 'function') renderFC();
 }
-
-function hlText(text, vocab) {
-  if (!vocab.size) return text;
-  let r = text;
-  vocab.forEach(v => {
-    r = r.replace(new RegExp(`(${v.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi'), '<mark class="hl">$1</mark>');
-  });
+function hlText(text, vocabSet) {
+  let r = escapeHtml(text);
+  vocabSet.forEach(w => { r = r.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '<mark class="hl">$&</mark>'); });
   return r;
 }
-
 function toggleVocab(el, word) {
-  if (activeVocab.has(word)) { activeVocab.delete(word); el.classList.remove('on'); }
-  else { activeVocab.add(word); el.classList.add('on'); }
-  document.getElementById('dlg').innerHTML = buildDlg(window._currentScenario);
+  if (activeVocab.has(word)) activeVocab.delete(word); else activeVocab.add(word);
+  el.classList.toggle('on', activeVocab.has(word));
+  if (window._currentScenario) document.querySelector('.dlg').innerHTML = renderDetailView(window._currentScenario);
 }
 
-function toggleLineMute(idx) {
-  window._currentScenario.lines[idx].muted = !window._currentScenario.lines[idx].muted;
-  document.getElementById('dlg').innerHTML = buildDlg(window._currentScenario);
+// ========== EDIT/DELETE ==========
+function editScenario(id) {
+  const s = SCENARIOS.find(s=>s.id===id);
+  if(!s) return;
+  document.getElementById('editing-scenario-id').value = id;
+  document.getElementById('c-title').value = s.title;
+  document.getElementById('c-sub').value = s.sub;
+  document.getElementById('c-icon').value = s.icon;
+  document.getElementById('c-level').value = s.level;
+  document.getElementById('c-vocab').value = s.vocab.join(', ');
+  document.getElementById('c-tip').value = s.tip.replace(/<[^>]*>/g,'');
+  tempManualLines = s.lines.map(l=>({speaker:l.speaker, role:l.role, text:l.text}));
+  renderManualLines();
+  openCreateModal('manual');
+}
+function deleteScenarioConfirm(id) {
+  if(confirm('Delete permanently?')) {
+    const idx = SCENARIOS.findIndex(s=>s.id===id);
+    if(idx!==-1) SCENARIOS.splice(idx,1);
+    persistScenarios();
+    if(window._currentScenario?.id===id) renderScenarioGrid();
+    else renderScenarioGrid();
+  }
 }
 
-/* ── Text selection → save popup ── */
-function setupSelectionListener() {
-  document.addEventListener('mouseup', e => {
-    const popup = document.getElementById('save-popup');
-    if (popup.contains(e.target)) return;
-    const sel = window.getSelection();
-    const txt = sel?.toString().trim();
-    if (!txt || txt.length < 2) { popup.classList.remove('vis'); return; }
-    const node = sel.anchorNode?.parentElement;
-    if (!node?.closest('.dlg')) { popup.classList.remove('vis'); return; }
-    const range = sel.getRangeAt(0), rect = range.getBoundingClientRect();
-    popup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
-    popup.style.left = Math.max(8, rect.left + window.scrollX - 10) + 'px';
-    popup.classList.add('vis');
-    const bubble = node.closest('.dbub');
-    pendingCtx = bubble ? bubble.innerText.replace(/^[A-Z]{2,}\n/, '').trim() : '';
-    pendingWord = txt;
-    document.getElementById('sp-save-btn').onclick = () => { popup.classList.remove('vis'); openWordModal(txt, pendingCtx); };
-    document.getElementById('sp-look-btn').onclick = () => { popup.classList.remove('vis'); openWordModal(txt, pendingCtx, true); };
-  });
-  document.addEventListener('mousedown', e => {
-    if (!document.getElementById('save-popup').contains(e.target))
-      document.getElementById('save-popup').classList.remove('vis');
-  });
-}
-
-/* ── Add Scenario Modal (manual) ── */
-function openAddModal() {
-  modalLines = [{ speaker: 'PM', role: 'pm', text: '' }, { speaker: 'Client', role: 'client', text: '' }];
-  renderModalLines();
+// ========== MODAL CREATE ==========
+function openCreateModal(tab='manual') {
+  document.getElementById('create-modal').classList.add('vis');
+  document.getElementById('editing-scenario-id').value = '';
+  tempManualLines = [{speaker:'PM',role:'pm',text:''},{speaker:'Client',role:'client',text:''}];
+  renderManualLines();
+  switchCreateTab(tab);
   populateGroupSelects();
-  document.getElementById('add-modal').classList.add('vis');
 }
-function closeAddModal() { document.getElementById('add-modal').classList.remove('vis'); }
-
+function closeCreateModal() { document.getElementById('create-modal').classList.remove('vis'); }
+function switchCreateTab(tab) {
+  document.querySelectorAll('.create-tab-pane').forEach(p=>p.style.display='none');
+  document.getElementById(`create-tab-${tab}`).style.display = 'block';
+}
+function renderManualLines() {
+  const container = document.getElementById('c-lines-container');
+  if(!container) return;
+  container.innerHTML = tempManualLines.map((l,i)=>`
+    <div class="line-block"><button onclick="removeManualLine(${i})">✕</button>
+    <input value="${escapeAttr(l.speaker)}" oninput="tempManualLines[${i}].speaker=this.value" placeholder="Speaker">
+    <select onchange="tempManualLines[${i}].role=this.value"><option ${l.role==='pm'?'selected':''}>pm</option><option ${l.role==='dev'?'selected':''}>dev</option><option ${l.role==='client'?'selected':''}>client</option></select>
+    <textarea oninput="tempManualLines[${i}].text=this.value">${escapeHtml(l.text)}</textarea></div>`).join('');
+}
+function addManualLine() { tempManualLines.push({speaker:'PM',role:'pm',text:''}); renderManualLines(); }
+function removeManualLine(i) { tempManualLines.splice(i,1); renderManualLines(); }
 function populateGroupSelects() {
-  const opts = `<option value="">— No group —</option>` + GROUPS.map(g => `<option value="${g.id}">${g.label}</option>`).join('');
-  const selAM = document.getElementById('m-group');
-  const selAI = document.getElementById('ai-group');
-  if (selAM) selAM.innerHTML = opts;
-  if (selAI) selAI.innerHTML = opts;
+  const opts = `<option value="">— No group —</option>` + GROUPS.map(g=>`<option value="${g.id}">${g.label}</option>`).join('');
+  const sel = document.getElementById('c-group');
+  if(sel) sel.innerHTML = opts;
 }
-
-function renderModalLines() {
-  document.getElementById('m-lines').innerHTML = modalLines.map((l, i) => `
-    <div class="line-block">
-      <button class="rm-btn" onclick="removeModalLine(${i})">✕</button>
-      <div class="row2">
-        <div><div class="fl">Speaker</div><input class="fi" value="${l.speaker}" oninput="modalLines[${i}].speaker=this.value" placeholder="PM"></div>
-        <div><div class="fl">Role</div><select class="fi" onchange="modalLines[${i}].role=this.value">
-          <option value="pm" ${l.role === 'pm' ? 'selected' : ''}>PM</option>
-          <option value="dev" ${l.role === 'dev' ? 'selected' : ''}>Dev Lead</option>
-          <option value="client" ${l.role === 'client' ? 'selected' : ''}>Client</option>
-        </select></div>
-      </div>
-      <div><div class="fl">Line (English)</div><textarea class="fi" oninput="modalLines[${i}].text=this.value" placeholder="Enter English dialogue…">${l.text}</textarea></div>
-    </div>`).join('');
-}
-function addModalLine() { modalLines.push({ speaker: 'PM', role: 'pm', text: '' }); renderModalLines(); }
-function removeModalLine(i) { modalLines.splice(i, 1); renderModalLines(); }
-
 function resolveGroup(selId, newgroupId) {
   const selVal = document.getElementById(selId)?.value;
   const newVal = document.getElementById(newgroupId)?.value.trim();
-  if (newVal) {
-    const existing = GROUPS.find(g => g.label.toLowerCase() === newVal.toLowerCase());
-    if (existing) return existing.id;
-    const newId = 'g' + Date.now();
-    GROUPS.push({ id: newId, label: newVal, icon: '📁' });
+  if(newVal) {
+    let existing = GROUPS.find(g=>g.label.toLowerCase()===newVal.toLowerCase());
+    if(existing) return existing.id;
+    const newId = 'g'+Date.now();
+    GROUPS.push({id:newId, label:newVal, icon:'📁'});
     return newId;
   }
   return selVal || null;
 }
-
 function saveManualScenario() {
-  const title = document.getElementById('m-title').value.trim();
-  if (!title) { alert('Please enter a title.'); return; }
-  const lines = modalLines.filter(l => l.text.trim()).map(l => ({ ...l, muted: false }));
-  if (!lines.length) { alert('Please add at least one line.'); return; }
-  const vocab = (document.getElementById('m-vocab').value || '').split(',').map(v => v.trim()).filter(Boolean);
-  const level = document.getElementById('m-level').value;
+  const title = document.getElementById('c-title').value.trim();
+  if(!title) return alert('Enter title');
+  const lines = tempManualLines.filter(l=>l.text.trim()).map(l=>({...l,muted:false}));
+  if(!lines.length) return alert('Add at least one line');
+  const vocab = (document.getElementById('c-vocab').value||'').split(',').map(v=>v.trim()).filter(Boolean);
+  const level = document.getElementById('c-level').value;
   const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
-  const icon = document.getElementById('m-icon').value.trim() || '📝';
-  const sub = document.getElementById('m-sub').value.trim() || '';
-  const tip = document.getElementById('m-tip').value.trim() || 'Practice this scenario regularly.';
-  const iconBg = { Beginner: '#edf7e3', Intermediate: '#deeeff', Advanced: '#fde8e8' }[level] || '#deeeff';
-  const groupId = resolveGroup('m-group', 'm-newgroup');
-  SCENARIOS.push({ id: 'c' + Date.now(), groupId, title, sub, icon, iconBg, level, levelColor: ls.color, levelBg: ls.bg, vocab, lines, tip });
-  closeAddModal(); renderSidebar(); loadScenario(SCENARIOS[SCENARIOS.length - 1].id);
-}
-
-/* ── AI Generate Scenario ── */
-function openAiModal() {
-  populateGroupSelects();
-  document.getElementById('ai-prompt').value = '';
-  document.getElementById('ai-status').classList.remove('vis');
-  document.getElementById('ai-preview').classList.remove('vis');
-  document.getElementById('ai-save-btn').style.display = 'none';
-  document.getElementById('ai-gen-btn').style.display = 'inline-flex';
-  document.getElementById('ai-spinner').style.display = 'none';
-  aiGeneratedData = null;
-  document.getElementById('ai-modal').classList.add('vis');
-}
-function closeAiModal() { document.getElementById('ai-modal').classList.remove('vis'); aiGeneratedData = null; }
-
-async function generateAiScenario() {
-  const prompt = document.getElementById('ai-prompt').value.trim();
-  if (!prompt) { alert('Please describe the situation first.'); return; }
-  const level = document.getElementById('ai-level').value;
-  const numLines = parseInt(document.getElementById('ai-lines').value, 10);
-
-  const genBtn = document.getElementById('ai-gen-btn');
-  const spinner = document.getElementById('ai-spinner');
-  const status = document.getElementById('ai-status');
-  const preview = document.getElementById('ai-preview');
-
-  genBtn.disabled = true; spinner.style.display = 'inline-block';
-  status.textContent = 'Generating dialogue with AI…'; status.classList.add('vis');
-  preview.classList.remove('vis');
-  document.getElementById('ai-save-btn').style.display = 'none';
-
-  const systemPrompt = `You are a business English content creator for project managers.
-Generate a realistic workplace dialogue scenario based on the user's description.
-Reply ONLY with a valid JSON object — no markdown, no preamble, no explanation.
-JSON structure:
-{
-  "title": "short English title",
-  "sub": "one-line English subtitle",
-  "icon": "single emoji",
-  "level": "${level}",
-  "vocab": ["word1","word2","word3","word4","word5","word6"],
-  "tip": "one concise PM language tip using <strong> tags for key phrases",
-  "lines": [
-    {"speaker":"PM","role":"pm","text":"..."},
-    {"speaker":"Client","role":"client","text":"..."}
-  ]
-}
-Rules:
-- Exactly ${numLines} lines in the dialogue
-- roles must be one of: pm, dev, client
-- vocab: 6-10 key business/PM phrases from the dialogue
-- All dialogue must be natural, professional English at ${level} level
-- tip must reference specific phrases from the dialogue`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await resp.json();
-    const raw = data.content?.find(c => c.type === 'text')?.text || '';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    aiGeneratedData = JSON.parse(clean);
-    aiGeneratedData.lines = aiGeneratedData.lines.map(l => ({ ...l, muted: false }));
-
-    const previewText = `Title: ${aiGeneratedData.title}\nSubtitle: ${aiGeneratedData.sub}\nLevel: ${aiGeneratedData.level}\n\nDIALOGUE:\n${aiGeneratedData.lines.map(l => `[${l.speaker}] ${l.text}`).join('\n\n')}\n\nVOCABULARY: ${aiGeneratedData.vocab.join(', ')}\n\nTIP: ${aiGeneratedData.tip.replace(/<[^>]*>/g, '')}`;
-    preview.textContent = previewText;
-    preview.classList.add('vis');
-    status.textContent = '✓ Dialogue generated — review and save.';
-    document.getElementById('ai-save-btn').style.display = 'inline-flex';
-  } catch (e) {
-    status.textContent = '❌ Generation failed. Check your connection and try again.';
-    console.error(e);
-  } finally {
-    genBtn.disabled = false; spinner.style.display = 'none';
+  const icon = document.getElementById('c-icon').value.trim()||'📝';
+  const sub = document.getElementById('c-sub').value.trim();
+  const tip = document.getElementById('c-tip').value.trim()||'Practice';
+  const iconBg = {Beginner:'#edf7e3',Intermediate:'#deeeff',Advanced:'#fde8e8'}[level]||'#deeeff';
+  const groupId = resolveGroup('c-group','c-newgroup');
+  const editingId = document.getElementById('editing-scenario-id').value;
+  if(editingId) {
+    const idx = SCENARIOS.findIndex(s=>s.id===editingId);
+    if(idx!==-1) SCENARIOS[idx] = {...SCENARIOS[idx], groupId, title, sub, icon, iconBg, level, levelColor:ls.color, levelBg:ls.bg, vocab, lines, tip };
+  } else {
+    SCENARIOS.push({ id:'c'+Date.now(), groupId, title, sub, icon, iconBg, level, levelColor:ls.color, levelBg:ls.bg, vocab, lines, tip });
   }
+  persistScenarios();
+  closeCreateModal();
+  renderScenarioGrid();
+  if(!editingId) loadScenario(SCENARIOS[SCENARIOS.length-1].id);
+  else loadScenario(editingId);
 }
 
-function saveAiScenario() {
-  if (!aiGeneratedData) return;
-  const level = aiGeneratedData.level || 'Intermediate';
+// ========== AI GEMINI ==========
+const GEMINI_API_KEY = AQ.Ab8RN6KbdCgXbro5fE0VoW85Vu8nP0oiZD-iFpUi3dcKbrKuyQ;
+async function callGemini(system, user) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contents:[{ role:'user', parts:[{ text:`${system}\n\n${user}` }] }], generationConfig:{ temperature:0.7 } }) });
+  if(!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return JSON.parse(raw.replace(/```json|```/g,'').trim());
+}
+async function generateAiScenario() {
+  const prompt = document.getElementById('ai-prompt-text').value.trim();
+  if(!prompt) return alert('Describe situation');
+  const level = document.getElementById('ai-level-gen').value;
+  const numLines = parseInt(document.getElementById('ai-lines-num').value);
+  const preview = document.getElementById('ai-preview-area');
+  preview.innerHTML = '<span>Generating...</span>';
+  const system = `Generate JSON dialogue: title, sub, icon, level:${level}, vocab array, tip, lines array exactly ${numLines} lines with speaker,role,text. No markdown.`;
+  try {
+    const gen = await callGemini(system, prompt);
+    window._aiTemp = gen;
+    preview.innerHTML = `<pre>${JSON.stringify(gen,null,2)}</pre><button class="btn-save" onclick="saveAiGeneratedScenario()">✅ Save</button>`;
+  } catch(e) { preview.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }
+}
+async function generateByKeyword() {
+  const kw = document.getElementById('keyword-input').value.trim();
+  if(!kw) return alert('Enter keyword');
+  const level = document.getElementById('keyword-level').value;
+  const numLines = parseInt(document.getElementById('keyword-lines').value);
+  const preview = document.getElementById('keyword-preview-area');
+  preview.innerHTML = '<span>Generating...</span>';
+  try {
+    const gen = await callGemini(`Create dialogue about ${kw}, level ${level}, ${numLines} lines, JSON only.`, kw);
+    window._aiTemp = gen;
+    preview.innerHTML = `<pre>${JSON.stringify(gen,null,2)}</pre><button class="btn-save" onclick="saveAiGeneratedScenario()">✅ Save</button>`;
+  } catch(e) { preview.innerHTML = `<span style="color:red">Error: ${e.message}</span>`; }
+}
+function saveAiGeneratedScenario() {
+  if(!window._aiTemp) return;
+  const gen = window._aiTemp;
+  const level = gen.level || 'Intermediate';
   const ls = LEVEL_S[level] || LEVEL_S.Intermediate;
-  const iconBg = { Beginner: '#edf7e3', Intermediate: '#deeeff', Advanced: '#fde8e8' }[level] || '#deeeff';
-  const groupId = resolveGroup('ai-group', 'ai-newgroup');
-  SCENARIOS.push({
-    id: 'ai' + Date.now(), groupId,
-    title: aiGeneratedData.title, sub: aiGeneratedData.sub,
-    icon: aiGeneratedData.icon || '🤖', iconBg,
-    level, levelColor: ls.color, levelBg: ls.bg,
-    vocab: aiGeneratedData.vocab || [], lines: aiGeneratedData.lines, tip: aiGeneratedData.tip || ''
-  });
-  closeAiModal(); renderSidebar(); loadScenario(SCENARIOS[SCENARIOS.length - 1].id);
+  const iconBg = {Beginner:'#edf7e3',Intermediate:'#deeeff',Advanced:'#fde8e8'}[level];
+  const groupId = resolveGroup('c-group','c-newgroup');
+  const newScenario = { id:'ai_'+Date.now(), groupId, title:gen.title, sub:gen.sub, icon:gen.icon||'🤖', iconBg, level, levelColor:ls.color, levelBg:ls.bg, vocab:gen.vocab||[], lines:gen.lines.map(l=>({...l,muted:false})), tip:gen.tip||'' };
+  SCENARIOS.push(newScenario);
+  persistScenarios();
+  renderScenarioGrid();
+  closeCreateModal();
+  loadScenario(newScenario.id);
 }
 
-/* ── Helpers ── */
-function esc(s) { return s.replace(/'/g, "\\'"); }
+// ========== IMPORT PASTE ==========
+function openImportTextModal() { document.getElementById('import-modal').classList.add('vis'); }
+function closeImportModal() { document.getElementById('import-modal').classList.remove('vis'); }
+function importParsedDialogue() {
+  const raw = document.getElementById('paste-dialogue').value;
+  const lines = raw.split(/\r?\n/).filter(l=>l.trim()).map(l=>{
+    const m = l.match(/^([^:：]+)[:：]\s*(.+)/);
+    if(m) return { speaker:m[1].trim(), role:m[1].toLowerCase().includes('dev')?'dev':(m[1].toLowerCase().includes('client')?'client':'pm'), text:m[2].trim(), muted:false };
+    return null;
+  }).filter(l=>l);
+  if(!lines.length) return alert('Invalid format. Use "Speaker: text"');
+  const title = document.getElementById('import-title').value.trim() || 'Imported';
+  const newId = 'imp_'+Date.now();
+  SCENARIOS.push({ id:newId, groupId:null, title, sub:'', icon:'📄', iconBg:'#deeeff', level:'Intermediate', vocab:[], tip:'', lines });
+  persistScenarios();
+  renderScenarioGrid();
+  closeImportModal();
+  loadScenario(newId);
+}
+
+// ========== SELECTION & UTILS ==========
+function setupSelectionListener() {
+  document.addEventListener('mouseup', e => {
+    const popup = document.getElementById('save-popup');
+    if(popup.contains(e.target)) return;
+    const sel = window.getSelection();
+    const txt = sel?.toString().trim();
+    if(!txt || txt.length<2) { popup.classList.remove('vis'); return; }
+    const node = sel.anchorNode?.parentElement;
+    if(!node?.closest('.dlg')) { popup.classList.remove('vis'); return; }
+    const range = sel.getRangeAt(0), rect = range.getBoundingClientRect();
+    popup.style.top = (rect.bottom+window.scrollY+6)+'px';
+    popup.style.left = Math.max(8, rect.left+window.scrollX-10)+'px';
+    popup.classList.add('vis');
+    const bubble = node.closest('.dbub');
+    window.pendingCtx = bubble ? bubble.innerText.replace(/^[A-Z]{2,}\n/,'').trim() : '';
+    window.pendingWord = txt;
+    document.getElementById('sp-save-btn').onclick = () => { popup.classList.remove('vis'); openWordModal(window.pendingWord, window.pendingCtx); };
+    document.getElementById('sp-look-btn').onclick = () => { popup.classList.remove('vis'); openWordModal(window.pendingWord, window.pendingCtx, true); };
+  });
+}
+function escapeHtml(str) { return str?.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])) || ''; }
+function escapeAttr(str) { return str?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') || ''; }
+
+// Export toàn bộ ra window
+window.renderScenarioGrid = renderScenarioGrid;
+window.loadScenario = loadScenario;
+window.setGroupFilter = setGroupFilter;
+window.resetGroupFilter = resetGroupFilter;
+window.toggleLineCompletion = toggleLineCompletion;
+window.editScenario = editScenario;
+window.deleteScenarioConfirm = deleteScenarioConfirm;
+window.openCreateModal = openCreateModal;
+window.closeCreateModal = closeCreateModal;
+window.switchCreateTab = switchCreateTab;
+window.addManualLine = addManualLine;
+window.removeManualLine = removeManualLine;
+window.openImportTextModal = openImportTextModal;
+window.closeImportModal = closeImportModal;
+window.importParsedDialogue = importParsedDialogue;
+window.toggleVocab = toggleVocab;
+window.saveAiGeneratedScenario = saveAiGeneratedScenario;
+window.setupSelectionListener = setupSelectionListener;
+window.loadCompletionData = loadCompletionData;
+window.saveCompletion = saveCompletion;
+
+// Gắn sự kiện AI sau khi DOM load
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('trigger-ai-gen')?.addEventListener('click', generateAiScenario);
+  document.getElementById('trigger-keyword-gen')?.addEventListener('click', generateByKeyword);
+  document.getElementById('final-save-scenario')?.addEventListener('click', saveManualScenario);
+});

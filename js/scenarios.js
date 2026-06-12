@@ -226,14 +226,29 @@ function saveManualScenario() {
 }
 
 // ========== AI GEMINI ==========
-const GEMINI_API_KEY = AQ.Ab8RN6KbdCgXbro5fE0VoW85Vu8nP0oiZD-iFpUi3dcKbrKuyQ;
+// Định nghĩa biến toàn cục để chứa API Key
+let GEMINI_API_KEY = null;
+
+// Hàm để lấy API Key từ biến toàn cục hoặc từ file config đã được inject
+function loadGeminiApiKey() {
+    if (GEMINI_API_KEY) return GEMINI_API_KEY;
+    // Kiểm tra xem file api-key.js đã được tạo và chạy chưa
+    if (typeof window !== 'undefined' && window.GEMINI_API_KEY) {
+        GEMINI_API_KEY = window.GEMINI_API_KEY;
+        return GEMINI_API_KEY;
+    }
+    // Fallback cho trường hợp dev local (nếu cần)
+    console.warn("API key not found. Please ensure GEMINI_API_KEY is defined.");
+    return null;
+}
+
+// Sửa lại hàm callGemini để dùng API key từ hàm load
 async function callGemini(system, user) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contents:[{ role:'user', parts:[{ text:`${system}\n\n${user}` }] }], generationConfig:{ temperature:0.7 } }) });
-  if(!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const apiKey = loadGeminiApiKey();
+    if (!apiKey) {
+        throw new Error('Gemini API key is missing. Please check your deployment configuration.');
+    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 }
 async function generateAiScenario() {
   const prompt = document.getElementById('ai-prompt-text').value.trim();

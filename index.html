@@ -236,18 +236,9 @@
     <div class="m-hd"><span class="m-title" id="create-modal-title">Create Scenario</span><button class="m-close" onclick="closeCreateModal()">✕</button></div>
     <div class="m-body">
       <div class="tab-row" style="margin-bottom:16px">
-        <button class="tab-btn" data-create-tab="manual" onclick="switchCreateTab('manual')">✍️ Manual</button>
         <button class="tab-btn" data-create-tab="ai" onclick="switchCreateTab('ai')">✨ AI Generate</button>
         <button class="tab-btn" data-create-tab="keyword" onclick="switchCreateTab('keyword')">🔑 Keyword Gen</button>
-      </div>
-      <div id="create-tab-manual" class="create-tab-pane">
-        <div><div class="fl">Group</div><select id="c-group"></select><input id="c-newgroup" placeholder="New group name"></div>
-        <div><div class="fl">Title</div><input id="c-title" placeholder="e.g. Budget Negotiation"></div>
-        <div><div class="fl">Subtitle</div><input id="c-sub" placeholder="Brief context"></div>
-        <div class="row2"><div><div class="fl">Icon emoji</div><input id="c-icon" value="📌"></div><div><div class="fl">Level</div><select id="c-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div></div>
-        <div><div class="fl">Vocabulary (comma)</div><input id="c-vocab" placeholder="negotiation, budget, stakeholder"></div>
-        <div><div class="fl">PM Tip</div><input id="c-tip" placeholder="Language tip"></div>
-        <div><div class="fl">Dialogue lines</div><div id="c-lines-container"></div><button class="add-line" onclick="addManualLine()">+ Add line</button></div>
+        <button class="tab-btn" data-create-tab="paste" onclick="openImportTextModal()">📋 Paste dialogue</button>
       </div>
       <div id="create-tab-ai" class="create-tab-pane" style="display:none">
         <div><div class="fl">Describe situation (Vi/En)</div><textarea id="ai-prompt-text" rows="3" placeholder="e.g. Project manager presenting risk mitigation to client"></textarea></div>

@@ -3,8 +3,183 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PM English — Business Scenarios</title>
+<title>Business English — Scenarios for PM & Professionals</title>
 <link rel="stylesheet" href="css/styles.css">
+<style>
+  /* Additional styles for new features */
+  :root {
+    --primary: #1a65ad;
+    --primary-light: #eef4fc;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg-body: #f8fafc;
+    --card-shadow: 0 8px 20px rgba(0,0,0,0.05);
+  }
+  body { background: var(--bg-body); }
+  
+  /* Scenario grid (main list) */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  .scenario-card {
+    background: white;
+    border-radius: 20px;
+    padding: 1rem 1rem 1rem 1.2rem;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    border: 1px solid #e9eef3;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .scenario-card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(0,0,0,0.08); }
+  .card-icon { font-size: 2.4rem; background: #f0f4fa; width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; border-radius: 18px; }
+  .card-info { flex: 1; }
+  .card-title { font-weight: 700; font-size: 1.1rem; color: #0f2b3d; }
+  .card-sub { font-size: 0.75rem; color: #5b6e8c; margin-top: 4px; }
+  .card-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .progress-mini { height: 6px; background: #e2e8f0; border-radius: 10px; width: 80px; overflow: hidden; }
+  .progress-mini-fill { background: var(--primary); height: 100%; width: 0%; border-radius: 10px; }
+  .level-badge { font-size: 0.65rem; background: #deeeff; padding: 2px 8px; border-radius: 30px; font-weight: 500; }
+  
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .filter-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .filter-chip {
+    background: white;
+    border: 1px solid #dce3ec;
+    padding: 6px 14px;
+    border-radius: 40px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .filter-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .back-btn {
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    color: var(--primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+  
+  /* Line completion styling */
+  .dline .completion-check {
+    margin-right: 12px;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  .dline .check-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #a0b8d4;
+    background: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: 0.1s;
+    margin-right: 8px;
+  }
+  .dline .check-circle.completed {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+  }
+  .scenario-progress {
+    background: #edf2f7;
+    border-radius: 60px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .achievement-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #facc15;
+    padding: 12px 24px;
+    border-radius: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 2000;
+    font-weight: 600;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    animation: fadeUp 0.4s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  /* music player */
+  .music-player {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+    background: rgba(255,255,255,0.9);
+  }
+  .music-btn {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+  }
+  /* edit/delete buttons in card */
+  .scard-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .icon-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: 0.1s;
+  }
+  .icon-btn:hover { opacity: 1; }
+  .empty-state { text-align: center; padding: 3rem; color: #7c8ba0; }
+</style>
 </head>
 <body>
 
@@ -12,8 +187,8 @@
   <div class="hdr-logo">
     <div class="hdr-icon">💼</div>
     <div>
-      <div class="hdr-name">PM English</div>
-      <div class="hdr-sub">Business Scenarios</div>
+      <div class="hdr-name">Business English</div>
+      <div class="hdr-sub">Scenarios for Professionals</div>
     </div>
   </div>
   <div class="hdr-right">
@@ -28,86 +203,80 @@
 </div>
 
 <div class="wrap">
-  <div class="grid">
+  <div class="grid" style="grid-template-columns: 280px 1fr;">
+    <!-- LEFT SIDEBAR: filters + add buttons -->
     <div class="sidebar">
-      <div class="sb-hd">Scenarios</div>
-      <div id="scenario-list"></div>
-      <button class="sb-add" onclick="openAddModal()">＋ Add manually</button>
-      <button class="sb-add sb-add-ai" onclick="openAiModal()">✦ Generate with AI</button>
+      <div class="sb-hd">Groups</div>
+      <div id="group-filter-list" class="filter-group-vertical"></div>
+      <div style="margin: 16px 0 12px 0;"><hr style="opacity:0.3"></div>
+      <button class="sb-add" onclick="openCreateModal()">＋ Add Scenario</button>
+      <button class="sb-add sb-add-ai" onclick="openCreateModal('ai')">✦ AI Generate</button>
+      <button class="sb-add" onclick="openImportTextModal()">📋 Paste dialogue</button>
     </div>
+
+    <!-- MAIN CONTENT: scenario list OR detail view -->
     <div id="main-col">
-      <div class="main-empty">
-        <div class="big">🎯</div>
-        <p>Select a scenario to start practicing</p>
+      <div id="dynamic-content">
+        <!-- will be filled by JS: either scenario grid or detail view -->
       </div>
     </div>
   </div>
 </div>
 
-<!-- ADD SCENARIO MODAL (manual) -->
-<div class="overlay" id="add-modal">
-  <div class="modal">
-    <div class="m-hd"><span class="m-title">Add New Scenario</span><button class="m-close" onclick="closeAddModal()">✕</button></div>
+<!-- MODAL for create/edit (unified) -->
+<div class="overlay" id="create-modal">
+  <div class="modal" style="max-width: 700px">
+    <div class="m-hd"><span class="m-title" id="create-modal-title">Create Scenario</span><button class="m-close" onclick="closeCreateModal()">✕</button></div>
     <div class="m-body">
-      <div>
-        <div class="fl">Group</div>
-        <select class="fi" id="m-group"><option value="">— No group —</option></select>
-        <input class="fi" id="m-newgroup" placeholder="Or type a new group name…" style="margin-top:6px">
+      <div class="tab-row" style="margin-bottom:16px">
+        <button class="tab-btn" data-create-tab="manual" onclick="switchCreateTab('manual')">✍️ Manual</button>
+        <button class="tab-btn" data-create-tab="ai" onclick="switchCreateTab('ai')">✨ AI Generate</button>
+        <button class="tab-btn" data-create-tab="keyword" onclick="switchCreateTab('keyword')">🔑 Keyword Gen</button>
       </div>
-      <div><div class="fl">Title</div><input class="fi" id="m-title" placeholder="e.g. Vendor Negotiation"></div>
-      <div><div class="fl">Subtitle</div><input class="fi" id="m-sub" placeholder="e.g. Negotiating with a third-party vendor"></div>
-      <div class="row2">
-        <div><div class="fl">Icon (emoji)</div><input class="fi" id="m-icon" placeholder="🤝" style="font-size:18px"></div>
-        <div><div class="fl">Level</div><select class="fi" id="m-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div>
+      <div id="create-tab-manual" class="create-tab-pane">
+        <div><div class="fl">Group</div><select id="c-group"></select><input id="c-newgroup" placeholder="New group name"></div>
+        <div><div class="fl">Title</div><input id="c-title" placeholder="e.g. Budget Negotiation"></div>
+        <div><div class="fl">Subtitle</div><input id="c-sub" placeholder="Brief context"></div>
+        <div class="row2"><div><div class="fl">Icon emoji</div><input id="c-icon" value="📌"></div><div><div class="fl">Level</div><select id="c-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div></div>
+        <div><div class="fl">Vocabulary (comma)</div><input id="c-vocab" placeholder="negotiation, budget, stakeholder"></div>
+        <div><div class="fl">PM Tip</div><input id="c-tip" placeholder="Language tip"></div>
+        <div><div class="fl">Dialogue lines</div><div id="c-lines-container"></div><button class="add-line" onclick="addManualLine()">+ Add line</button></div>
       </div>
-      <div><div class="fl">Key vocabulary (comma-separated)</div><input class="fi" id="m-vocab" placeholder="negotiate, vendor, contract, terms"></div>
-      <div><div class="fl">PM Tip</div><input class="fi" id="m-tip" placeholder="Language tip for this scenario..."></div>
-      <div>
-        <div class="fl">Dialogue lines</div>
-        <div id="m-lines"></div>
-        <button class="add-line" onclick="addModalLine()">＋ Add line</button>
+      <div id="create-tab-ai" class="create-tab-pane" style="display:none">
+        <div><div class="fl">Describe situation (Vi/En)</div><textarea id="ai-prompt-text" rows="3" placeholder="e.g. Project manager presenting risk mitigation to client"></textarea></div>
+        <div class="row2"><div><div class="fl">Level</div><select id="ai-level-gen"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div><div><div class="fl">Lines</div><select id="ai-lines-num"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option></select></div></div>
+        <button class="btn-save" id="trigger-ai-gen" style="margin-top:8px">✨ Generate Dialogue</button>
+        <div id="ai-preview-area" class="ai-preview" style="margin-top:12px; background:#f1f5f9; padding:10px; border-radius:12px; font-size:13px;"></div>
       </div>
+      <div id="create-tab-keyword" class="create-tab-pane" style="display:none">
+        <div><div class="fl">Keyword / Topic</div><input id="keyword-input" placeholder="e.g. product launch, agile retrospective"></div>
+        <div class="row2"><div><div class="fl">Level</div><select id="keyword-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div><div><div class="fl">Lines</div><select id="keyword-lines"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option></select></div></div>
+        <button class="btn-save" id="trigger-keyword-gen">🔮 Generate by keyword</button>
+        <div id="keyword-preview-area" class="ai-preview" style="margin-top:12px;"></div>
+      </div>
+      <input type="hidden" id="editing-scenario-id" value="">
     </div>
     <div class="m-ft">
-      <button class="btn-ghost" onclick="closeAddModal()">Cancel</button>
-      <button class="btn-save" onclick="saveManualScenario()">Save Scenario</button>
+      <button class="btn-ghost" onclick="closeCreateModal()">Cancel</button>
+      <button class="btn-save" id="final-save-scenario">Save Scenario</button>
     </div>
   </div>
 </div>
 
-<!-- AI GENERATE MODAL -->
-<div class="overlay" id="ai-modal">
-  <div class="modal">
-    <div class="m-hd"><span class="m-title">✦ Generate Scenario with AI</span><button class="m-close" onclick="closeAiModal()">✕</button></div>
+<!-- Import text modal (paste dialogue) -->
+<div class="overlay" id="import-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="m-hd"><span>📋 Paste Dialogue</span><button class="m-close" onclick="closeImportModal()">✕</button></div>
     <div class="m-body">
-      <div>
-        <div class="fl">Group (optional)</div>
-        <select class="fi" id="ai-group"><option value="">— No group —</option></select>
-        <input class="fi" id="ai-newgroup" placeholder="Or type a new group name…" style="margin-top:6px">
-      </div>
-      <div>
-        <div class="fl">Describe the situation (in Vietnamese or English)</div>
-        <textarea class="fi" id="ai-prompt" rows="4" placeholder="e.g. Tình huống PM phải trình bày kế hoạch dự án trước hội đồng đầu tư. Cần thuyết phục họ về timeline và ngân sách."></textarea>
-      </div>
-      <div class="row2">
-        <div><div class="fl">Level</div><select class="fi" id="ai-level"><option>Beginner</option><option selected>Intermediate</option><option>Advanced</option></select></div>
-        <div><div class="fl">Number of lines</div><select class="fi" id="ai-lines"><option value="4">4 lines</option><option value="6" selected>6 lines</option><option value="8">8 lines</option></select></div>
-      </div>
-      <div class="ai-status" id="ai-status">Generating dialogue…</div>
-      <div class="ai-preview" id="ai-preview"></div>
+      <div class="fl">Paste dialogue lines (format: Speaker: text)</div>
+      <textarea id="paste-dialogue" rows="8" placeholder="PM: Let's review the timeline.&#10;Client: I agree, but we need more resources.&#10;Dev Lead: We can adjust sprints accordingly." style="width:100%"></textarea>
+      <div class="fl" style="margin-top:10px">Title (optional)</div><input id="import-title" placeholder="Scenario title">
     </div>
-    <div class="m-ft">
-      <button class="btn-ghost" onclick="closeAiModal()">Cancel</button>
-      <button class="btn-ai" id="ai-gen-btn" onclick="generateAiScenario()">
-        <span class="spinner" id="ai-spinner" style="display:none"></span>
-        ✦ Generate
-      </button>
-      <button class="btn-save" id="ai-save-btn" onclick="saveAiScenario()" style="display:none">Save Scenario</button>
-    </div>
+    <div class="m-ft"><button class="btn-save" onclick="importParsedDialogue()">Import & Save</button></div>
   </div>
 </div>
 
-<!-- WORD MODAL -->
+<!-- Word modal (vocab) -->
 <div class="overlay" id="word-modal">
   <div class="modal" style="max-width:480px">
     <div class="m-hd"><span class="m-title" id="wm-title">Save word</span><button class="m-close" onclick="closeWordModal()">✕</button></div>
@@ -128,36 +297,6 @@
 <script src="js/audio.js"></script>
 <script src="js/vocab.js"></script>
 <script src="js/scenarios.js"></script>
-<script>
-/* ── Bootstrap ── */
-window._currentScenario = null;
-
-async function init() {
-  // Migrate + load saved words
-  savedWords = savedWords.map(w => ({ reps: 0, ...w }));
-
-  // Load all scenario .md files
-  await loadScenarios();
-
-  // Boot audio
-  refreshVoices();
-  if (window.speechSynthesis) speechSynthesis.onvoiceschanged = refreshVoices;
-
-  // Render
-  renderSidebar();
-  setupSelectionListener();
-  updateFCPill();
-  listSubTab = getDefaultListTab();
-}
-
-// Close modals on backdrop click
-window.addEventListener('click', e => {
-  if (e.target === document.getElementById('add-modal'))  closeAddModal();
-  if (e.target === document.getElementById('ai-modal'))   closeAiModal();
-  if (e.target === document.getElementById('word-modal')) closeWordModal();
-});
-
-init();
-</script>
+<script src="js/main.js"></script>
 </body>
 </html>

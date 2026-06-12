@@ -4,8 +4,6 @@
    ═══════════════════════════ */
 
 /* Runtime scenario list (populated after MD load) */
-let SCENARIOS = [];
-
 const ROLES = {
   pm:     { label: 'PM',  dot: '#2176c7', avBg: '#b8d8f8', avColor: '#042C53' },
   dev:    { label: 'Dev', dot: '#3b8a16', avBg: '#bfe0a0', avColor: '#173404' },

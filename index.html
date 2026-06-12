@@ -137,7 +137,7 @@ async function init() {
   savedWords = savedWords.map(w => ({ reps: 0, ...w }));
 
   // Load all scenario .md files
-  SCENARIOS = await loadScenarios();
+  await loadScenarios();
 
   // Boot audio
   refreshVoices();
